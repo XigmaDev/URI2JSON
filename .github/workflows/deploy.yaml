@@ -42,6 +42,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
           script: |
             sudo mv /home/${{ secrets.SSH_USERNAME }}/uri2json /usr/local/bin/uri2json
             sudo chmod +x /usr/local/bin/uri2json
