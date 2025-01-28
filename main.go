@@ -130,22 +130,61 @@ type Request struct {
 type SingboxConfig struct {
 	Dns       []string          `json:"dns"`
 	Log       Log               `json:"log"`
-	Inbounds  []Inbound         `json:"inbounds"`
+	Inbounds  []InboundSingbox  `json:"inbounds"`
 	Outbounds []OutboundSingbox `json:"outbounds"`
 }
+
+// "log": {
+//         "level": "error"
+//     },
 
 type Log struct {
 	Level string `json:"level"`
 }
 
+// "inbounds": [
+//         {
+//             "domain_strategy": "",
+//             "listen": "0.0.0.0",
+//             "listen_port": 2080,
+//             "sniff": true,
+//             "sniff_override_destination": false,
+//             "tag": "mixed-in",
+//             "type": "mixed"
+//         }
+//     ],
+
+type InboundSingbox struct {
+	Type          string `json:"type"`
+	Tag           string `json:"tag"`
+	Listen        string `json:"listen"`
+	Port          int    `json:"listen_port"`
+	Sniff         bool   `json:"sniff"`
+	SniffOverride bool   `json:"sniff_override_destination"`
+	Domain        string `json:"domain_strategy"`
+}
+
 type OutboundSingbox struct {
-	Type       string      `json:"type"`
-	Tag        string      `json:"tag"`
-	Server     string      `json:"server"`
-	ServerPort int         `json:"server_port"`
-	Settings   interface{} `json:"settings"`
-	TLS        TLS         `json:"tls"`
-	Transport  Transport   `json:"transport"`
+	Type       string    `json:"type"`
+	Tag        string    `json:"tag"`
+	Server     string    `json:"server"`
+	ServerPort int       `json:"server_port"`
+	UUID       string    `json:"uuid"`
+	FLOW       string    `json:"flow"`
+	Network    string    `json:"network"`
+	TLS        TLS       `json:"tls"`
+	MULTIPLEX  MULTIPLEX `json:"multiplex"`
+	Transport  Transport `json:"transport"`
+}
+
+type MULTIPLEX struct {
+	Enabled       bool   `json:"enabled"`
+	Protocol      string `json:"protocol"`
+	Maxconnection int    `json:"max_connections"`
+	MinStream     int    `json:"min_stream"`
+	MaxStream     int    `json:"max_stream"`
+	Padding       bool   `json:"padding"`
+	Brutal        string `json:"brutal"`
 }
 
 type TLS struct {
@@ -162,62 +201,84 @@ type Transport struct {
 	Path string `json:"path"`
 }
 
+func getString(data map[string]interface{}, key string) string {
+	if value, ok := data[key]; ok {
+		if str, ok := value.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
 func parseURI(uri string) (*Config, error) {
-	var ruri string
 	if strings.HasPrefix(uri, "vmess://") {
 		decoded, err := base64.StdEncoding.DecodeString(uri[8:])
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode Base64: %v", err)
 		}
-		ruri = string(decoded)
-	} else {
-		ruri = uri
-	}
-	parsedURL, err := url.Parse(ruri)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse URI: %v", err)
-	}
-
-	config := &Config{
-		Protocol: parsedURL.Scheme,
-		Address:  parsedURL.Hostname(),
-		Port:     parsedURL.Port(),
-		Fragment: parsedURL.Fragment,
-	}
-
-	switch config.Protocol {
-	case "vless", "vmess":
-		userInfo := parsedURL.User
-		config.UUID = userInfo.Username()
-		queryParams := parsedURL.Query()
-		config.Type = queryParams.Get("type")
-		config.Path = queryParams.Get("path")
-		config.Host = queryParams.Get("host")
-		config.Mode = queryParams.Get("mode")
-		config.Security = queryParams.Get("security")
-		config.Fingerprint = queryParams.Get("fp")
-		config.ALPN = queryParams.Get("alpn")
-		config.AllowInsecure = queryParams.Get("allowInsecure")
-		config.SNI = queryParams.Get("sni")
-	case "ss":
-		userInfo := parsedURL.User
-		decoded, err := base64.RawURLEncoding.DecodeString(userInfo.Username())
+		var rawConfig map[string]interface{}
+		err = json.Unmarshal(decoded, &rawConfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode Shadowsocks password: %v", err)
+			return nil, fmt.Errorf("failed to unmarshal JSON: %v", err)
 		}
-		parts := strings.Split(string(decoded), ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid Shadowsocks URI format")
+		config := &Config{
+			Protocol: "vmess",
+			UUID:     getString(rawConfig, "id"),
+			Address:  getString(rawConfig, "add"),
+			Port:     getString(rawConfig, "port"),
+			Type:     getString(rawConfig, "type"),
+			Path:     getString(rawConfig, "path"),
+			Host:     getString(rawConfig, "host"),
+			Security: getString(rawConfig, "tls"),
 		}
-		config.Method = parts[0]
-		config.Password = parts[1]
-	case "trojan":
-		config.Password = parsedURL.User.Username()
-	default:
-		return nil, fmt.Errorf("unsupported protocol: %s", config.Protocol)
-	}
 
-	return config, nil
+		return config, nil
+	} else {
+		parsedURL, err := url.Parse(uri)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse URI: %v", err)
+		}
+
+		config := &Config{
+			Protocol: parsedURL.Scheme,
+			Address:  parsedURL.Hostname(),
+			Port:     parsedURL.Port(),
+			Fragment: parsedURL.Fragment,
+		}
+
+		switch config.Protocol {
+		case "vless":
+			userInfo := parsedURL.User
+			config.UUID = userInfo.Username()
+			queryParams := parsedURL.Query()
+			config.Type = queryParams.Get("type")
+			config.Path = queryParams.Get("path")
+			config.Host = queryParams.Get("host")
+			config.Mode = queryParams.Get("mode")
+			config.Security = queryParams.Get("security")
+			config.Fingerprint = queryParams.Get("fp")
+			config.ALPN = queryParams.Get("alpn")
+			config.AllowInsecure = queryParams.Get("allowInsecure")
+			config.SNI = queryParams.Get("sni")
+		case "ss":
+			userInfo := parsedURL.User
+			decoded, err := base64.RawURLEncoding.DecodeString(userInfo.Username())
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode Shadowsocks password: %v", err)
+			}
+			parts := strings.Split(string(decoded), ":")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid Shadowsocks URI format")
+			}
+			config.Method = parts[0]
+			config.Password = parts[1]
+		case "trojan":
+			config.Password = parsedURL.User.Username()
+		default:
+			return nil, fmt.Errorf("unsupported protocol: %s", config.Protocol)
+		}
+		return config, nil
+	}
 }
 
 func generateXrayConfig(config *Config) ([]byte, error) {
@@ -341,21 +402,8 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			Tag:        fmt.Sprintf("%s-outbound", config.Protocol),
 			Server:     config.Address,
 			ServerPort: 8443,
-			Settings: map[string]interface{}{
-				"vnext": []map[string]interface{}{
-					{
-						"address": config.Address,
-						"port":    8443,
-						"users": []map[string]interface{}{
-							{
-								"id":         config.UUID,
-								"encryption": "none",
-								"level":      0,
-							},
-						},
-					},
-				},
-			},
+			UUID:       config.UUID,
+			FLOW:       "none",
 			TLS: TLS{
 				Enabled:     true,
 				ServerName:  config.SNI,
