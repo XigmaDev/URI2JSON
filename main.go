@@ -537,6 +537,9 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Enabled:  false,
 				Protocol: "",
 			},
+			Settings: VlessSettingSingBox{
+				Flow: config.Security,
+			},
 		}
 	case "ss":
 		outbound = OutboundSingbox{
@@ -669,12 +672,30 @@ func main() {
 				return err
 			}
 		} else {
-			_, err := bot.Send(user, fmt.Sprintf("Sing-box Configuration:\n```json\n%s\n```", singboxJSON), &tele.SendOptions{
-				ParseMode: tele.ModeMarkdown,
-			})
+			jsonData, err := json.MarshalIndent(singboxJSON, "", "  ")
 			if err != nil {
+				fmt.Println("Error marshaling to JSON:", err)
 				return err
 			}
+			jsonFilePath := "config.json"
+			if err := os.WriteFile(jsonFilePath, jsonData, 0644); err != nil {
+				fmt.Println("Error writing JSON file:", err)
+				return err
+			} else {
+				_, err := bot.Send(user, fmt.Sprintf("Sing-box Configuration:\n```json\n%s\n```", singboxJSON), &tele.SendOptions{
+					ParseMode: tele.ModeMarkdown,
+				})
+				if err != nil {
+					return err
+				}
+				document := &tele.Document{File: tele.FromDisk(jsonFilePath)}
+				_, err = bot.Send(user, document)
+				if err != nil {
+					fmt.Println("Error sending document:", err)
+					return err
+				}
+			}
+			defer os.Remove(jsonFilePath)
 		}
 
 		return c.Send(text)
