@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -175,6 +176,7 @@ type OutboundSingbox struct {
 	MULTIPLEX  MULTIPLEXSingBox  `json:"multiplex"`
 	Transport  TransportSingBox  `json:"transport"`
 	UdpOverTcp UdpOverTcpSingBox `json:"udp_over_tcp"`
+	Settings   interface{}       `json:"settings"`
 }
 
 // https://sing-box.sagernet.org/configuration/outbound/trojan/
@@ -437,82 +439,164 @@ func generateXrayConfig(config *Config) ([]byte, error) {
 func generateSingboxConfig(config *Config) ([]byte, error) {
 	singboxConfig := SingboxConfig{
 		Log: Log{
-			Level: "info",
+			Level: "error",
 		},
-		Inbounds: []Inbound{
+		Inbounds: []InboundSingbox{
 			{
-				Port:     1080,
-				Protocol: "socks",
-				Settings: Settings{
-					Auth: "noauth",
-					UDP:  true,
-				},
-				Tag: "socks-inbound",
+				Type:          "mixed",
+				Tag:           "mixed-in",
+				Listen:        "::",
+				Port:          2080,
+				Sniff:         true,
+				SniffOverride: false,
+				Domain:        "",
 			},
 		},
 	}
 
 	var outbound OutboundSingbox
 	switch config.Protocol {
-	case "vless", "vmess":
+	case "vmess":
 		outbound = OutboundSingbox{
-			Type:       config.Protocol,
-			Tag:        fmt.Sprintf("%s-outbound", config.Protocol),
-			Server:     config.Address,
-			ServerPort: 8443,
-			UUID:       config.UUID,
-			FLOW:       "none",
-			TLS: TLS{
-				Enabled:     true,
-				ServerName:  config.SNI,
-				ALPN:        []string{"h3", "h2", "http/1.1"},
-				Fingerprint: config.Fingerprint,
-				Insecure:    config.AllowInsecure == "1",
+			Type:   config.Protocol,
+			Tag:    fmt.Sprintf("%s-out", config.Protocol),
+			Server: config.Address,
+			ServerPort: func() int {
+				port, _ := strconv.Atoi(config.Port)
+				return port
+			}(),
+			UUID: config.UUID,
+			Settings: VmessSettingSingBox{
+				Security:       "auto",
+				AlterID:        config.AlterID,
+				GlobalPadding:  false,
+				AuthLength:     true,
+				PacketEncoding: "",
 			},
-			Transport: Transport{
-				Type: "http",
+			Network: config.Network,
+			TLS: TLSSingBox{
+				Enabled:    true,
+				ServerName: config.SNI,
+				ALPN:       config.ALPN,
+				MinVersion: "",
+				MaxVersion: "",
+				Insecure:   config.AllowInsecure == "1",
+				UTLS: UTLSSingBox{
+					Enabled:     true,
+					Fingerprint: config.Fingerprint,
+				},
+				Reality: RealitySingBox{
+					Enabled:   false,
+					PublicKey: config.PublicKey,
+					ShortID:   config.Short_Id,
+				},
+			},
+			Transport: TransportSingBox{
+				Type: config.Type,
 				Host: config.Host,
 				Path: config.Path,
 			},
 		}
+	case "vless":
+		outbound = OutboundSingbox{
+			Type:   config.Protocol,
+			Tag:    fmt.Sprintf("%s-outbound", config.Protocol),
+			Server: config.Address,
+			ServerPort: func() int {
+				port, _ := strconv.Atoi(config.Port)
+				return port
+			}(),
+			UUID:    config.UUID,
+			Network: config.Network,
+			TLS: TLSSingBox{
+				Enabled:    true,
+				ServerName: config.SNI,
+				ALPN:       config.ALPN,
+				MinVersion: "",
+				MaxVersion: "",
+				Insecure:   config.AllowInsecure == "1",
+				UTLS: UTLSSingBox{
+					Enabled:     true,
+					Fingerprint: config.Fingerprint,
+				},
+				Reality: RealitySingBox{
+					Enabled:   false,
+					PublicKey: config.PublicKey,
+					ShortID:   config.Short_Id,
+				},
+			},
+			Transport: TransportSingBox{
+				Type: config.Type,
+				Host: config.Host,
+				Path: config.Path,
+			},
+			MULTIPLEX: MULTIPLEXSingBox{
+				Enabled:  false,
+				Protocol: "",
+			},
+		}
 	case "ss":
 		outbound = OutboundSingbox{
-			Type:       "shadowsocks",
-			Tag:        "shadowsocks-outbound",
-			Server:     config.Address,
-			ServerPort: 8443,
-			Settings: map[string]interface{}{
-				"servers": []map[string]interface{}{
-					{
-						"address":  config.Address,
-						"port":     8443,
-						"method":   config.Method,
-						"password": config.Password,
-					},
-				},
+			Type:   "shadowsocks",
+			Tag:    fmt.Sprintf("%s-out", config.Protocol),
+			Server: config.Address,
+			ServerPort: func() int {
+				port, _ := strconv.Atoi(config.Port)
+				return port
+			}(),
+			Network: config.Network,
+			Settings: ShadowsocksSettingSingBox{
+				Method:     config.Method,
+				Password:   config.Password,
+				Plugin:     "",
+				PluginOpts: "",
+			},
+			UdpOverTcp: UdpOverTcpSingBox{
+				Enabled: false,
+				Version: 0,
+			},
+			MULTIPLEX: MULTIPLEXSingBox{
+				Enabled:  false,
+				Protocol: "",
 			},
 		}
 	case "trojan":
 		outbound = OutboundSingbox{
-			Type:       "trojan",
-			Tag:        "trojan-outbound",
-			Server:     config.Address,
-			ServerPort: 8443,
-			Settings: map[string]interface{}{
-				"servers": []map[string]interface{}{
-					{
-						"address":  config.Address,
-						"port":     8443,
-						"password": config.Password,
-					},
+			Type:   "trojan",
+			Tag:    fmt.Sprintf("%s-out", config.Protocol),
+			Server: config.Address,
+			ServerPort: func() int {
+				port, _ := strconv.Atoi(config.Port)
+				return port
+			}(),
+			Settings: TrojanSettingSingBox{
+				Password: config.Password,
+			},
+			TLS: TLSSingBox{
+				Enabled:    true,
+				ServerName: config.SNI,
+				ALPN:       config.ALPN,
+				MinVersion: "",
+				MaxVersion: "",
+				Insecure:   config.AllowInsecure == "1",
+				UTLS: UTLSSingBox{
+					Enabled:     true,
+					Fingerprint: config.Fingerprint,
+				},
+				Reality: RealitySingBox{
+					Enabled:   false,
+					PublicKey: config.PublicKey,
+					ShortID:   config.Short_Id,
 				},
 			},
-			TLS: TLS{
-				Enabled:     true,
-				ServerName:  config.SNI,
-				ALPN:        []string{"h3", "h2", "http/1.1"},
-				Fingerprint: config.Fingerprint,
-				Insecure:    config.AllowInsecure == "1",
+			MULTIPLEX: MULTIPLEXSingBox{
+				Enabled:  false,
+				Protocol: "",
+			},
+			Transport: TransportSingBox{
+				Type: config.Type,
+				Host: config.Host,
+				Path: config.Path,
 			},
 		}
 	default:
