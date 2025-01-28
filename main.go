@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	tele "gopkg.in/telebot.v4"
 )
 
@@ -608,7 +610,13 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 }
 
 func main() {
-	botToken := "8029568919:AAFlxxsYa0pQ5ZwioNx9be4L1BtForJ-vHY"
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	botToken := os.Getenv("BOT_TOKEN")
+
 	if botToken == "" {
 		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is not set")
 	}
