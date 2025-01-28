@@ -1,0 +1,44 @@
+name: Deploy via SSH
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "go.mod" 
+          cache: true 
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build Linux binary
+        run: GOOS=linux GOARCH=amd64 go build -o uri2json ./cmd/uri2json
+
+      - name: Upload binary via SCP
+        uses: appleboy/scp-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }} 
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }} 
+          source: "uri2json" 
+          target: "/tmp/uri2json" 
+
+      - name: Restart application via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo mv /tmp/uri2json /usr/local/bin/uri2json
+            sudo chmod +x /usr/local/bin/uri2json
+            sudo systemctl restart uri2json.service
