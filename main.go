@@ -165,19 +165,52 @@ type InboundSingbox struct {
 }
 
 type OutboundSingbox struct {
-	Type       string    `json:"type"`
-	Tag        string    `json:"tag"`
-	Server     string    `json:"server"`
-	ServerPort int       `json:"server_port"`
-	UUID       string    `json:"uuid"`
-	FLOW       string    `json:"flow"`
-	Network    string    `json:"network"`
-	TLS        TLS       `json:"tls"`
-	MULTIPLEX  MULTIPLEX `json:"multiplex"`
-	Transport  Transport `json:"transport"`
+	Type       string            `json:"type"`
+	Tag        string            `json:"tag"`
+	Server     string            `json:"server"`
+	ServerPort int               `json:"server_port"`
+	UUID       string            `json:"uuid"`
+	Network    string            `json:"network"`
+	TLS        TLSSingBox        `json:"tls"`
+	MULTIPLEX  MULTIPLEXSingBox  `json:"multiplex"`
+	Transport  TransportSingBox  `json:"transport"`
+	UdpOverTcp UdpOverTcpSingBox `json:"udp_over_tcp"`
 }
 
-type MULTIPLEX struct {
+// https://sing-box.sagernet.org/configuration/outbound/trojan/
+type TrojanSettingSingBox struct {
+	Password string `json:"password"`
+}
+
+// https://sing-box.sagernet.org/configuration/outbound/vless/
+type VlessSettingSingBox struct {
+	Flow           string `json:"flow"`
+	PacketEncoding string `json:"packet_encoding"`
+}
+
+// https://sing-box.sagernet.org/configuration/outbound/vmess/
+type VmessSettingSingBox struct {
+	Security       string `json:"security"`
+	AlterID        int    `json:"alter_id"`
+	GlobalPadding  bool   `json:"global_padding"`
+	AuthLength     bool   `json:"authenticated_length"`
+	PacketEncoding string `json:"packet_encoding"`
+}
+
+// https://sing-box.sagernet.org/configuration/outbound/shadowsocks/
+type ShadowsocksSettingSingBox struct {
+	Method     string `json:"method"`
+	Password   string `json:"password"`
+	Plugin     string `json:"plugin"`
+	PluginOpts string `json:"plugin_opts"`
+}
+
+type UdpOverTcpSingBox struct {
+	Enabled bool `json:"enabled"`
+	Version int  `json:"version"`
+}
+
+type MULTIPLEXSingBox struct {
 	Enabled       bool   `json:"enabled"`
 	Protocol      string `json:"protocol"`
 	Maxconnection int    `json:"max_connections"`
@@ -187,15 +220,40 @@ type MULTIPLEX struct {
 	Brutal        string `json:"brutal"`
 }
 
-type TLS struct {
-	Enabled     bool     `json:"enabled"`
-	ServerName  string   `json:"server_name"`
-	ALPN        []string `json:"alpn"`
-	Fingerprint string   `json:"fingerprint"`
-	Insecure    bool     `json:"insecure"`
+//	"tls": {
+//	                "alpn": [
+//	                    "h2"
+//	                ],
+//	                "enabled": true,
+//	                "server_name": "test.rs",
+//	                "utls": {
+//	                    "enabled": true,
+//	                    "fingerprint": "chrome"
+//	                }
+//	            },
+type TLSSingBox struct {
+	Enabled    bool           `json:"enabled"`
+	ServerName string         `json:"server_name"`
+	ALPN       []string       `json:"alpn"`
+	Insecure   bool           `json:"insecure"`
+	MinVersion string         `json:"min_version"`
+	MaxVersion string         `json:"max_version"`
+	UTLS       UTLSSingBox    `json:"utls"`
+	Reality    RealitySingBox `json:"reality"`
 }
 
-type Transport struct {
+type UTLSSingBox struct {
+	Enabled     bool   `json:"enabled"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+type RealitySingBox struct {
+	Enabled   bool   `json:"enabled"`
+	PublicKey string `json:"public_key"`
+	ShortID   string `json:"short_id"`
+}
+
+type TransportSingBox struct {
 	Type string `json:"type"`
 	Host string `json:"host"`
 	Path string `json:"path"`
