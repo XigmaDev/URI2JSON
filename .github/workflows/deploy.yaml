@@ -30,7 +30,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           source: "uri2json" 
-          target: "/tmp/uri2json" 
+          target: "/home/${{ secrets.SSH_USERNAME }}/uri2json" 
 
       - name: Restart application via SSH
         uses: appleboy/ssh-action@v0.1.10
@@ -39,6 +39,6 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo mv /tmp/uri2json /usr/local/bin/uri2json
+            sudo mv /home/${{ secrets.SSH_USERNAME }}/uri2json /usr/local/bin/uri2json
             sudo chmod +x /usr/local/bin/uri2json
             sudo systemctl restart uri2json.service
