@@ -33,6 +33,9 @@ type Config struct {
 	Password      string
 	Method        string
 	Remark        string
+	Network       string
+	PublicKey     string
+	ShortID       string
 }
 
 // XrayConfig
@@ -284,14 +287,17 @@ func parseURI(uri string) (*Config, error) {
 			return nil, fmt.Errorf("failed to unmarshal JSON: %v", err)
 		}
 		config := &Config{
-			Protocol: "vmess",
-			UUID:     getString(rawConfig, "id"),
-			Address:  getString(rawConfig, "add"),
-			Port:     getString(rawConfig, "port"),
-			Type:     getString(rawConfig, "type"),
-			Path:     getString(rawConfig, "path"),
-			Host:     getString(rawConfig, "host"),
-			Security: getString(rawConfig, "tls"),
+			Protocol:    "vmess",
+			UUID:        getString(rawConfig, "id"),
+			Address:     getString(rawConfig, "add"),
+			Port:        getString(rawConfig, "port"),
+			Type:        getString(rawConfig, "type"),
+			Path:        getString(rawConfig, "path"),
+			Host:        getString(rawConfig, "host"),
+			Security:    getString(rawConfig, "tls"),
+			Network:     getString(rawConfig, "net"),
+			Fingerprint: getString(rawConfig, "fingerprint"),
+			ALPN:        getString(rawConfig, "alpn"),
 		}
 
 		return config, nil
@@ -470,7 +476,7 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			UUID: config.UUID,
 			Settings: VmessSettingSingBox{
 				Security:       "auto",
-				AlterID:        config.AlterID,
+				AlterID:        0,
 				GlobalPadding:  false,
 				AuthLength:     true,
 				PacketEncoding: "",
@@ -479,18 +485,13 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			TLS: TLSSingBox{
 				Enabled:    true,
 				ServerName: config.SNI,
-				ALPN:       config.ALPN,
+				ALPN:       strings.Split(config.ALPN, ","),
 				MinVersion: "",
 				MaxVersion: "",
 				Insecure:   config.AllowInsecure == "1",
 				UTLS: UTLSSingBox{
 					Enabled:     true,
 					Fingerprint: config.Fingerprint,
-				},
-				Reality: RealitySingBox{
-					Enabled:   false,
-					PublicKey: config.PublicKey,
-					ShortID:   config.Short_Id,
 				},
 			},
 			Transport: TransportSingBox{
@@ -509,11 +510,11 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				return port
 			}(),
 			UUID:    config.UUID,
-			Network: config.Network,
+			Network: config.Type,
 			TLS: TLSSingBox{
 				Enabled:    true,
 				ServerName: config.SNI,
-				ALPN:       config.ALPN,
+				ALPN:       strings.Split(config.ALPN, ","),
 				MinVersion: "",
 				MaxVersion: "",
 				Insecure:   config.AllowInsecure == "1",
@@ -524,7 +525,7 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Reality: RealitySingBox{
 					Enabled:   false,
 					PublicKey: config.PublicKey,
-					ShortID:   config.Short_Id,
+					ShortID:   config.ShortID,
 				},
 			},
 			Transport: TransportSingBox{
@@ -577,7 +578,7 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			TLS: TLSSingBox{
 				Enabled:    true,
 				ServerName: config.SNI,
-				ALPN:       config.ALPN,
+				ALPN:       strings.Split(config.ALPN, ","),
 				MinVersion: "",
 				MaxVersion: "",
 				Insecure:   config.AllowInsecure == "1",
@@ -588,7 +589,7 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Reality: RealitySingBox{
 					Enabled:   false,
 					PublicKey: config.PublicKey,
-					ShortID:   config.Short_Id,
+					ShortID:   config.ShortID,
 				},
 			},
 			MULTIPLEX: MULTIPLEXSingBox{
@@ -616,7 +617,6 @@ func main() {
 	}
 
 	botToken := os.Getenv("BOT_TOKEN")
-
 	if botToken == "" {
 		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is not set")
 	}

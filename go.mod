@@ -18,6 +18,7 @@ require (
 	github.com/gookit/color v1.5.3 // indirect
 	github.com/gvcgo/goutils v0.8.5 // indirect
 	github.com/gvcgo/vpnparser v0.2.7 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
