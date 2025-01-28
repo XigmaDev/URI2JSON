@@ -17,6 +17,9 @@ jobs:
           go-version-file: "go.mod" 
           cache: true 
 
+      - name: Install dependencies
+        run: go mod tidy
+  
       - name: Run tests
         run: go test ./...
 
