@@ -31,7 +31,8 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }} 
           username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }} 
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
           source: "uri2json" 
           target: "/home/${{ secrets.SSH_USERNAME }}/uri2json" 
 
