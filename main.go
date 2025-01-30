@@ -134,26 +134,26 @@ type Request struct {
 
 // SingboxConfig
 type SingboxVmessConfig struct {
-	Dns       []string         `json:"dns"`
+	//Dns       []string         `json:"dns"`
 	Log       Log              `json:"log"`
 	Inbounds  []InboundSingbox `json:"inbounds"`
 	Outbounds []VmessSingBox   `json:"outbounds"`
 }
 
 type SingboxVlessConfig struct {
-	Dns       []string         `json:"dns"`
+	//Dns       []string         `json:"dns"`
 	Log       Log              `json:"log"`
 	Inbounds  []InboundSingbox `json:"inbounds"`
 	Outbounds []VlessSingBox   `json:"outbounds"`
 }
 type SingboxTrojanConfig struct {
-	Dns       []string         `json:"dns"`
+	//Dns       []string         `json:"dns"`
 	Log       Log              `json:"log"`
 	Inbounds  []InboundSingbox `json:"inbounds"`
 	Outbounds []TrojanSingBox  `json:"outbounds"`
 }
 type SingboxSSConfig struct {
-	Dns       []string             `json:"dns"`
+	//Dns       []string             `json:"dns"`
 	Log       Log                  `json:"log"`
 	Inbounds  []InboundSingbox     `json:"inbounds"`
 	Outbounds []ShadowsocksSingBox `json:"outbounds"`
