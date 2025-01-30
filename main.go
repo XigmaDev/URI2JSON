@@ -776,13 +776,8 @@ func main() {
 				return err
 			}
 		} else {
-			jsonData, err := json.MarshalIndent(singboxJSON, "", "  ")
-			if err != nil {
-				fmt.Println("Error marshaling to JSON:", err)
-				return err
-			}
 			jsonFilePath := "config.json"
-			if err := os.WriteFile(jsonFilePath, jsonData, 0644); err != nil {
+			if err := os.WriteFile(jsonFilePath, singboxJSON, 0644); err != nil {
 				fmt.Println("Error writing JSON file:", err)
 				return err
 			} else {
