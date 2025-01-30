@@ -6,7 +6,7 @@ use crate::Protocol;
 
 
 #[derive(Debug)]
-struct SingBoxConfig {
+pub struct SingBoxConfig {
     inbounds: Vec<Value>,
     outbounds: Vec<Value>,
 }
