@@ -3,7 +3,7 @@ mod error;
 mod protocols;
 mod utils;
 
-use protocols::Protocol;
+use crate::protocols::Protocol;
 
 
 #[tokio::main]
@@ -15,9 +15,18 @@ async fn main() {
     ];
     for u in &uri {
         match u.parse::<Protocol>() {
-            Ok(protocol) => println!("{}", protocol.to_singbox_outbound()),
-            Err(e) => eprintln!("Failed to parse {}: {}", u, e),
-
+            Ok(protocol) => {
+                let mut config = config::SingBoxConfig::new();
+                config.add_default_inbound();
+                config.add_outbound(&protocol);        
+                let filename = format!("config_{}_{}.json", protocol.get_type(), chrono::Local::now().timestamp());
+                if let Err(e) = config.save_to_file(&filename) {
+                    eprintln!("Failed to save config to file: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to parse {}: {}", u, e);
+            }
         }
     }
 }
