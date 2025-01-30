@@ -787,7 +787,7 @@ func main() {
 				if err != nil {
 					return err
 				}
-				document := &tele.Document{File: tele.FromDisk(jsonFilePath)}
+				document := &tele.Document{File: tele.FromDisk(jsonFilePath), FileName: "SingBoxConfig.json", MIME: "application/json", Caption: "Sing-box Configuration"}
 				_, err = bot.Send(user, document)
 				if err != nil {
 					fmt.Println("Error sending document:", err)
