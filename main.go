@@ -133,11 +133,30 @@ type Request struct {
 }
 
 // SingboxConfig
-type SingboxConfig struct {
-	Dns       []string          `json:"dns"`
-	Log       Log               `json:"log"`
-	Inbounds  []InboundSingbox  `json:"inbounds"`
-	Outbounds []OutboundSingbox `json:"outbounds"`
+type SingboxVmessConfig struct {
+	Dns       []string         `json:"dns"`
+	Log       Log              `json:"log"`
+	Inbounds  []InboundSingbox `json:"inbounds"`
+	Outbounds []VmessSingBox   `json:"outbounds"`
+}
+
+type SingboxVlessConfig struct {
+	Dns       []string         `json:"dns"`
+	Log       Log              `json:"log"`
+	Inbounds  []InboundSingbox `json:"inbounds"`
+	Outbounds []VlessSingBox   `json:"outbounds"`
+}
+type SingboxTrojanConfig struct {
+	Dns       []string         `json:"dns"`
+	Log       Log              `json:"log"`
+	Inbounds  []InboundSingbox `json:"inbounds"`
+	Outbounds []TrojanSingBox  `json:"outbounds"`
+}
+type SingboxSSConfig struct {
+	Dns       []string             `json:"dns"`
+	Log       Log                  `json:"log"`
+	Inbounds  []InboundSingbox     `json:"inbounds"`
+	Outbounds []ShadowsocksSingBox `json:"outbounds"`
 }
 
 // "log": {
@@ -170,7 +189,21 @@ type InboundSingbox struct {
 	Domain        string `json:"domain_strategy"`
 }
 
-type OutboundSingbox struct {
+// type OutboundSingbox struct {
+// 	Type       string            `json:"type"`
+// 	Tag        string            `json:"tag"`
+// 	Server     string            `json:"server"`
+// 	ServerPort int               `json:"server_port"`
+// 	UUID       string            `json:"uuid"`
+// 	Network    string            `json:"network"`
+// 	TLS        TLSSingBox        `json:"tls"`
+// 	MULTIPLEX  MULTIPLEXSingBox  `json:"multiplex"`
+// 	Transport  TransportSingBox  `json:"transport"`
+// 	UdpOverTcp UdpOverTcpSingBox `json:"udp_over_tcp"`
+// }
+
+// https://sing-box.sagernet.org/configuration/outbound/trojan/
+type TrojanSingBox struct {
 	Type       string            `json:"type"`
 	Tag        string            `json:"tag"`
 	Server     string            `json:"server"`
@@ -181,35 +214,60 @@ type OutboundSingbox struct {
 	MULTIPLEX  MULTIPLEXSingBox  `json:"multiplex"`
 	Transport  TransportSingBox  `json:"transport"`
 	UdpOverTcp UdpOverTcpSingBox `json:"udp_over_tcp"`
-	Settings   interface{}       `json:"settings"`
-}
-
-// https://sing-box.sagernet.org/configuration/outbound/trojan/
-type TrojanSettingSingBox struct {
-	Password string `json:"password"`
+	Password   string            `json:"password"`
 }
 
 // https://sing-box.sagernet.org/configuration/outbound/vless/
-type VlessSettingSingBox struct {
-	Flow           string `json:"flow"`
-	PacketEncoding string `json:"packet_encoding"`
+type VlessSingBox struct {
+	Type           string            `json:"type"`
+	Tag            string            `json:"tag"`
+	Server         string            `json:"server"`
+	ServerPort     int               `json:"server_port"`
+	UUID           string            `json:"uuid"`
+	Network        string            `json:"network"`
+	TLS            TLSSingBox        `json:"tls"`
+	MULTIPLEX      MULTIPLEXSingBox  `json:"multiplex"`
+	Transport      TransportSingBox  `json:"transport"`
+	UdpOverTcp     UdpOverTcpSingBox `json:"udp_over_tcp"`
+	Flow           string            `json:"flow"`
+	PacketEncoding string            `json:"packet_encoding"`
 }
 
 // https://sing-box.sagernet.org/configuration/outbound/vmess/
-type VmessSettingSingBox struct {
-	Security       string `json:"security"`
-	AlterID        int    `json:"alter_id"`
-	GlobalPadding  bool   `json:"global_padding"`
-	AuthLength     bool   `json:"authenticated_length"`
-	PacketEncoding string `json:"packet_encoding"`
+type VmessSingBox struct {
+	Type           string            `json:"type"`
+	Tag            string            `json:"tag"`
+	Server         string            `json:"server"`
+	ServerPort     int               `json:"server_port"`
+	UUID           string            `json:"uuid"`
+	Network        string            `json:"network"`
+	TLS            TLSSingBox        `json:"tls"`
+	MULTIPLEX      MULTIPLEXSingBox  `json:"multiplex"`
+	Transport      TransportSingBox  `json:"transport"`
+	UdpOverTcp     UdpOverTcpSingBox `json:"udp_over_tcp"`
+	Security       string            `json:"security"`
+	AlterID        int               `json:"alter_id"`
+	GlobalPadding  bool              `json:"global_padding"`
+	AuthLength     bool              `json:"authenticated_length"`
+	PacketEncoding string            `json:"packet_encoding"`
 }
 
 // https://sing-box.sagernet.org/configuration/outbound/shadowsocks/
-type ShadowsocksSettingSingBox struct {
-	Method     string `json:"method"`
-	Password   string `json:"password"`
-	Plugin     string `json:"plugin"`
-	PluginOpts string `json:"plugin_opts"`
+type ShadowsocksSingBox struct {
+	Type       string            `json:"type"`
+	Tag        string            `json:"tag"`
+	Server     string            `json:"server"`
+	ServerPort int               `json:"server_port"`
+	UUID       string            `json:"uuid"`
+	Network    string            `json:"network"`
+	TLS        TLSSingBox        `json:"tls"`
+	MULTIPLEX  MULTIPLEXSingBox  `json:"multiplex"`
+	Transport  TransportSingBox  `json:"transport"`
+	UdpOverTcp UdpOverTcpSingBox `json:"udp_over_tcp"`
+	Method     string            `json:"method"`
+	Password   string            `json:"password"`
+	Plugin     string            `json:"plugin"`
+	PluginOpts string            `json:"plugin_opts"`
 }
 
 type UdpOverTcpSingBox struct {
@@ -445,43 +503,42 @@ func generateXrayConfig(config *Config) ([]byte, error) {
 }
 
 func generateSingboxConfig(config *Config) ([]byte, error) {
-	singboxConfig := SingboxConfig{
-		Log: Log{
-			Level: "error",
-		},
-		Inbounds: []InboundSingbox{
-			{
-				Type:          "mixed",
-				Tag:           "mixed-in",
-				Listen:        "::",
-				Port:          2080,
-				Sniff:         true,
-				SniffOverride: false,
-				Domain:        "",
-			},
-		},
+
+	port, err := strconv.Atoi(config.Port)
+	if err != nil {
+		return nil, fmt.Errorf("invalid port: %v", err)
 	}
 
-	var outbound OutboundSingbox
 	switch config.Protocol {
 	case "vmess":
-		outbound = OutboundSingbox{
-			Type:   config.Protocol,
-			Tag:    fmt.Sprintf("%s-out", config.Protocol),
-			Server: config.Address,
-			ServerPort: func() int {
-				port, _ := strconv.Atoi(config.Port)
-				return port
-			}(),
-			UUID: config.UUID,
-			Settings: VmessSettingSingBox{
-				Security:       "auto",
-				AlterID:        0,
-				GlobalPadding:  false,
-				AuthLength:     true,
-				PacketEncoding: "",
+		singboxVmessConfig := SingboxVmessConfig{
+			Log: Log{
+				Level: "error",
 			},
-			Network: config.Network,
+			Inbounds: []InboundSingbox{
+				{
+					Type:          "mixed",
+					Tag:           "mixed-in",
+					Listen:        "::",
+					Port:          2080,
+					Sniff:         true,
+					SniffOverride: false,
+					Domain:        "",
+				},
+			},
+		}
+		outbound := VmessSingBox{
+			Type:           config.Protocol,
+			Tag:            fmt.Sprintf("%s-out", config.Protocol),
+			Server:         config.Address,
+			ServerPort:     port,
+			UUID:           config.UUID,
+			Security:       "auto",
+			AlterID:        0,
+			GlobalPadding:  false,
+			AuthLength:     true,
+			PacketEncoding: "",
+			Network:        config.Network,
 			TLS: TLSSingBox{
 				Enabled:    true,
 				ServerName: config.SNI,
@@ -500,10 +557,28 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Path: config.Path,
 			},
 		}
+		singboxVmessConfig.Outbounds = []VmessSingBox{outbound}
+		return json.MarshalIndent(singboxVmessConfig, "", "  ")
 	case "vless":
-		outbound = OutboundSingbox{
+		singboxVlessConfig := SingboxVlessConfig{
+			Log: Log{
+				Level: "error",
+			},
+			Inbounds: []InboundSingbox{
+				{
+					Type:          "mixed",
+					Tag:           "mixed-in",
+					Listen:        "::",
+					Port:          2080,
+					Sniff:         true,
+					SniffOverride: false,
+					Domain:        "",
+				},
+			},
+		}
+		outbound := VlessSingBox{
 			Type:   config.Protocol,
-			Tag:    fmt.Sprintf("%s-outbound", config.Protocol),
+			Tag:    fmt.Sprintf("%s-out", config.Protocol),
 			Server: config.Address,
 			ServerPort: func() int {
 				port, _ := strconv.Atoi(config.Port)
@@ -537,12 +612,28 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Enabled:  false,
 				Protocol: "",
 			},
-			Settings: VlessSettingSingBox{
-				Flow: config.Security,
+			Flow: config.Security,
+		}
+		singboxVlessConfig.Outbounds = []VlessSingBox{outbound}
+		return json.MarshalIndent(singboxVlessConfig, "", "  ")
+	case "ss":
+		singboxssConfig := SingboxSSConfig{
+			Log: Log{
+				Level: "error",
+			},
+			Inbounds: []InboundSingbox{
+				{
+					Type:          "mixed",
+					Tag:           "mixed-in",
+					Listen:        "::",
+					Port:          2080,
+					Sniff:         true,
+					SniffOverride: false,
+					Domain:        "",
+				},
 			},
 		}
-	case "ss":
-		outbound = OutboundSingbox{
+		outbound := ShadowsocksSingBox{
 			Type:   "shadowsocks",
 			Tag:    fmt.Sprintf("%s-out", config.Protocol),
 			Server: config.Address,
@@ -550,13 +641,11 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				port, _ := strconv.Atoi(config.Port)
 				return port
 			}(),
-			Network: config.Network,
-			Settings: ShadowsocksSettingSingBox{
-				Method:     config.Method,
-				Password:   config.Password,
-				Plugin:     "",
-				PluginOpts: "",
-			},
+			Network:    config.Network,
+			Method:     config.Method,
+			Password:   config.Password,
+			Plugin:     "",
+			PluginOpts: "",
 			UdpOverTcp: UdpOverTcpSingBox{
 				Enabled: false,
 				Version: 0,
@@ -566,8 +655,26 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Protocol: "",
 			},
 		}
+		singboxssConfig.Outbounds = []ShadowsocksSingBox{outbound}
+		return json.MarshalIndent(singboxssConfig, "", "  ")
 	case "trojan":
-		outbound = OutboundSingbox{
+		singboxTrojanConfig := SingboxTrojanConfig{
+			Log: Log{
+				Level: "error",
+			},
+			Inbounds: []InboundSingbox{
+				{
+					Type:          "mixed",
+					Tag:           "mixed-in",
+					Listen:        "::",
+					Port:          2080,
+					Sniff:         true,
+					SniffOverride: false,
+					Domain:        "",
+				},
+			},
+		}
+		outbound := TrojanSingBox{
 			Type:   "trojan",
 			Tag:    fmt.Sprintf("%s-out", config.Protocol),
 			Server: config.Address,
@@ -575,9 +682,7 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				port, _ := strconv.Atoi(config.Port)
 				return port
 			}(),
-			Settings: TrojanSettingSingBox{
-				Password: config.Password,
-			},
+			Password: config.Password,
 			TLS: TLSSingBox{
 				Enabled:    true,
 				ServerName: config.SNI,
@@ -605,12 +710,11 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 				Path: config.Path,
 			},
 		}
+		singboxTrojanConfig.Outbounds = []TrojanSingBox{outbound}
+		return json.MarshalIndent(singboxTrojanConfig, "", "  ")
 	default:
 		return nil, fmt.Errorf("unsupported protocol: %s", config.Protocol)
 	}
-
-	singboxConfig.Outbounds = []OutboundSingbox{outbound}
-	return json.MarshalIndent(singboxConfig, "", "  ")
 }
 
 func main() {

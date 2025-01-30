@@ -44,6 +44,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            sudo mv /home/${{ secrets.SSH_USERNAME }}/uri2json /usr/local/bin/uri2json
-            sudo chmod +x /usr/local/bin/uri2json
+            echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > /home/${{ secrets.SSH_USERNAME }}/uri2json/.env
+            sudo chmod +x /home/${{ secrets.SSH_USERNAME }}/uri2json/uri2json
             sudo systemctl restart uri2json.service
