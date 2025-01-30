@@ -540,14 +540,14 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			PacketEncoding: "",
 			Network:        config.Network,
 			TLS: TLSSingBox{
-				Enabled:    true,
+				Enabled:    config.SNI != "",
 				ServerName: config.SNI,
 				ALPN:       strings.Split(config.ALPN, ","),
 				MinVersion: "",
 				MaxVersion: "",
 				Insecure:   config.AllowInsecure == "1",
 				UTLS: UTLSSingBox{
-					Enabled:     true,
+					Enabled:     config.Fingerprint != "",
 					Fingerprint: config.Fingerprint,
 				},
 			},
@@ -577,28 +577,25 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			},
 		}
 		outbound := VlessSingBox{
-			Type:   config.Protocol,
-			Tag:    fmt.Sprintf("%s-out", config.Protocol),
-			Server: config.Address,
-			ServerPort: func() int {
-				port, _ := strconv.Atoi(config.Port)
-				return port
-			}(),
-			UUID:    config.UUID,
-			Network: config.Type,
+			Type:       config.Protocol,
+			Tag:        fmt.Sprintf("%s-out", config.Protocol),
+			Server:     config.Address,
+			ServerPort: port,
+			UUID:       config.UUID,
+			Network:    config.Type,
 			TLS: TLSSingBox{
-				Enabled:    true,
+				Enabled:    config.SNI != "",
 				ServerName: config.SNI,
 				ALPN:       strings.Split(config.ALPN, ","),
 				MinVersion: "",
 				MaxVersion: "",
 				Insecure:   config.AllowInsecure == "1",
 				UTLS: UTLSSingBox{
-					Enabled:     true,
+					Enabled:     config.Fingerprint != "",
 					Fingerprint: config.Fingerprint,
 				},
 				Reality: RealitySingBox{
-					Enabled:   false,
+					Enabled:   config.PublicKey != "" && config.ShortID != "",
 					PublicKey: config.PublicKey,
 					ShortID:   config.ShortID,
 				},
@@ -634,13 +631,10 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			},
 		}
 		outbound := ShadowsocksSingBox{
-			Type:   "shadowsocks",
-			Tag:    fmt.Sprintf("%s-out", config.Protocol),
-			Server: config.Address,
-			ServerPort: func() int {
-				port, _ := strconv.Atoi(config.Port)
-				return port
-			}(),
+			Type:       "shadowsocks",
+			Tag:        fmt.Sprintf("%s-out", config.Protocol),
+			Server:     config.Address,
+			ServerPort: port,
 			Network:    config.Network,
 			Method:     config.Method,
 			Password:   config.Password,
@@ -675,27 +669,24 @@ func generateSingboxConfig(config *Config) ([]byte, error) {
 			},
 		}
 		outbound := TrojanSingBox{
-			Type:   "trojan",
-			Tag:    fmt.Sprintf("%s-out", config.Protocol),
-			Server: config.Address,
-			ServerPort: func() int {
-				port, _ := strconv.Atoi(config.Port)
-				return port
-			}(),
-			Password: config.Password,
+			Type:       "trojan",
+			Tag:        fmt.Sprintf("%s-out", config.Protocol),
+			Server:     config.Address,
+			ServerPort: port,
+			Password:   config.Password,
 			TLS: TLSSingBox{
-				Enabled:    true,
+				Enabled:    config.SNI != "",
 				ServerName: config.SNI,
 				ALPN:       strings.Split(config.ALPN, ","),
 				MinVersion: "",
 				MaxVersion: "",
 				Insecure:   config.AllowInsecure == "1",
 				UTLS: UTLSSingBox{
-					Enabled:     true,
+					Enabled:     config.Fingerprint != "",
 					Fingerprint: config.Fingerprint,
 				},
 				Reality: RealitySingBox{
-					Enabled:   false,
+					Enabled:   config.PublicKey != "" && config.ShortID != "",
 					PublicKey: config.PublicKey,
 					ShortID:   config.ShortID,
 				},
