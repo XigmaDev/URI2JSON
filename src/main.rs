@@ -5,7 +5,6 @@ mod utils;
 
 use crate::protocols::Protocol;
 
-
 #[tokio::main]
 async fn main() {
     let uri = [
@@ -17,6 +16,8 @@ async fn main() {
         match u.parse::<Protocol>() {
             Ok(protocol) => {
                 let mut config = config::SingBoxConfig::new();
+                config.set_log_level("info");
+                config.add_dns_server("1.1.1.1");
                 config.add_default_inbound();
                 config.add_outbound(&protocol);        
                 let filename = format!("config_{}_{}.json", protocol.get_type(), chrono::Local::now().timestamp());
