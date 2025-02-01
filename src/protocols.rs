@@ -1,12 +1,9 @@
 use serde_json::{json, Value};
 use url::Url;
 use std::collections::HashMap;
-use crate::error::ConversionError;
 use base64::engine::general_purpose;
 use std::str::FromStr;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
-
 
 #[derive(Debug)]
 pub enum Protocol {
@@ -81,8 +78,6 @@ struct RealityConfig {
     public_key: String,
     short_id: String,
 }
-
-
 
 
 
@@ -315,7 +310,7 @@ impl Protocol {
                 mtu,
                 ip,
             } => {
-                let mut config = json!({
+                let config = json!({
                     "type": "wireguard",
                     "local_address": [ip],
                     "private_key": private_key,
@@ -401,26 +396,35 @@ impl TransportConfig {
             "ws" => json!({
                 "type": "ws",
                 "path": self.path,
-                "headers": self.headers
+                "headers": self.headers,
+                "max_early_data": 0,
+                "early_data_header_name": ""              
             }),
             "http" => json!({
                 "type": "http",
                 "path": self.path,
-                "host": self.host
+                "host": self.host,
+                "method": self.mode,
+                "headers": self.headers,
+                "idle_timeout": "15s",
+                "ping_timeout": "15s"
             }),
             "quic" => json!({
                 "type": "quic",
-                "security": self.quic_security,
-                "key": self.key
+                //No additional encryption support: It's basically duplicate encryption. And Xray-core is not compatible with v2ray-core in here.
             }),
             "grpc" => json!({
                 "type": "grpc",
-                "service_name": self.service_name
+                "service_name": self.service_name,
+                "idle_timeout": "15s",
+                "ping_timeout": "15s",
+                "permit_without_stream": false
             }),
             "httpupgrade" => json!({
                 "type": "httpupgrade",
                 "host": self.host,
-                "path": self.path
+                "path": self.path,
+                "headers": self.headers
             }),
             _ => json!({"type": self.network}),
         }
@@ -437,6 +441,7 @@ impl TlsConfig {
 
         if let Some(reality) = &self.reality {
             config["reality"] = json!({
+                "enabled": true,
                 "public_key": reality.public_key,
                 "short_id": reality.short_id
             });
