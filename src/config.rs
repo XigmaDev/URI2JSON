@@ -85,7 +85,7 @@ impl SingBoxConfig {
     // }
     pub fn set_log_level(&mut self, level: &str) {
         self.log = json!({
-            "enabled": true,
+            "disabled": false,
             "level": level,
             "timestamp": true
         });
@@ -114,7 +114,7 @@ impl SingBoxConfig {
     }
 
 
-    
+
 
     // {
     //     "route": {
