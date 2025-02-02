@@ -21,7 +21,11 @@ impl SingBoxConfig {
     pub fn new() -> Self {
         Self {
             log: json!({}),
-            dns: json!({}),
+            dns: json!({
+                "servers": [],
+                "rules": [],
+                "final": "remote"
+            }),
             ntp: json!({}),
             endpoints: Vec::new(),
             inbounds: Vec::new(),
@@ -29,6 +33,22 @@ impl SingBoxConfig {
             route: json!({}),
             experimental: json!({}),
         }
+    }
+
+    // {
+    //     "log": {
+    //       "disabled": false,
+    //       "level": "info",
+    //       "output": "box.log",
+    //       "timestamp": true
+    //     }
+    // }
+    pub fn set_log_level(&mut self, level: &str) {
+        self.log = json!({
+            "disabled": false,
+            "level": level,
+            "timestamp": true
+        });
     }
 
     pub fn add_default_inbound(&mut self) {
@@ -48,50 +68,6 @@ impl SingBoxConfig {
             "tag": "direct"
         }));
     }
-
-    pub fn save_to_file(&self, filename: &str) -> Result<(), ConversionError> {
-        let mut map = Map::new();
-
-        map.insert("log".to_string(), self.log.clone());
-        map.insert("dns".to_string(), self.dns.clone());
-        map.insert("ntp".to_string(), self.ntp.clone());
-        map.insert("endpoints".to_string(), Value::Array(self.endpoints.clone()));
-        map.insert("inbounds".to_string(), Value::Array(self.inbounds.clone()));
-        map.insert("outbounds".to_string(), Value::Array(self.outbounds.clone()));
-        map.insert("route".to_string(), self.route.clone());
-        map.insert("experimental".to_string(), self.experimental.clone());
-
-        let content = serde_json::to_string_pretty(&Value::Object(map))
-            .map_err(|e| ConversionError::SerializationError(e.to_string()))?;
-
-        fs::write(Path::new(filename), content)
-            .map_err(|e| ConversionError::IoError(e.to_string()))?;
-
-        Ok(())
-    }  
-}
-
-
-
-// Optional: Add methods to configure other sections
-impl SingBoxConfig {
-    // {
-    //     "log": {
-    //       "disabled": false,
-    //       "level": "info",
-    //       "output": "box.log",
-    //       "timestamp": true
-    //     }
-    // }
-    pub fn set_log_level(&mut self, level: &str) {
-        self.log = json!({
-            "disabled": false,
-            "level": level,
-            "timestamp": true
-        });
-    }
-
-
     // {
     //     "dns": {
     //       "servers": [],
@@ -107,16 +83,87 @@ impl SingBoxConfig {
     //       "fakeip": {}
     //     }
     //   }
-    pub fn add_dns_server(&mut self, server: &str) {
-        self.dns = json!({
-            "servers": [server]
-        });
+    //Example:
+    // {
+    //     "servers": [
+    //       {
+    //         "tag": "remote",
+    //         "address": "8.8.8.8",
+    //         "strategy": "prefer_ipv4",
+    //         "detour": "proxy"
+    //       },
+    //       {
+    //         "tag": "local",
+    //         "address": "223.5.5.5",
+    //         "strategy": "prefer_ipv4",
+    //         "detour": "direct"
+    //       },
+    //       {
+    //         "tag": "block",
+    //         "address": "rcode://success"
+    //       }
+    //     ],
+    //     "rules": [
+    //       {
+    //         "rule_set": [
+    //           "geosite-cn",
+    //           "geosite-geolocation-cn"
+    //         ],
+    //         "server": "local"
+    //       },
+    //       {
+    //         "rule_set": [
+    //           "geosite-category-ads-all"
+    //         ],
+    //         "server": "block"
+    //       }
+    //     ],
+    //     "final": "remote"
+    //   }
+
+    pub fn add_dns_server(&mut self, tag: &str, address: &str, strategy: Option<&str>, detour: Option<&str>) {
+        let mut server = serde_json::Map::new();
+        server.insert("tag".into(), tag.into());
+        server.insert("address".into(), address.into());
+        
+        if let Some(s) = strategy {
+            server.insert("strategy".into(), s.into());
+        }
+        
+        if let Some(d) = detour {
+            server.insert("detour".into(), d.into());
+        }
+
+        if let Value::Object(ref mut dns) = self.dns {
+            if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
+                servers.push(Value::Object(server));
+            }
+        }
+    }
+
+    pub fn add_dns_rule(&mut self, rule_sets: Vec<&str>, server_tag: &str) {
+        let mut rule = serde_json::Map::new();
+        rule.insert(
+            "rule_set".into(),
+            Value::Array(rule_sets.iter().map(|s| Value::String(s.to_string())).collect())
+        );
+        rule.insert("server".into(), server_tag.into());
+
+        if let Value::Object(ref mut dns) = self.dns {
+            if let Some(Value::Array(ref mut rules)) = dns.get_mut("rules") {
+                rules.push(Value::Object(rule));
+            }
+        }
+    }
+
+    pub fn set_dns_final(&mut self, final_server: &str) {
+        if let Value::Object(ref mut dns) = self.dns {
+            dns.insert("final".into(), Value::String(final_server.to_string()));
+        }
     }
 
 
-
-
-    // {
+      // {
     //     "route": {
     //       "rules": [],
     //       "rule_set": [],
@@ -145,4 +192,32 @@ impl SingBoxConfig {
 
         });
     }
+
+
+
+
+    
+
+    pub fn save_to_file(&self, filename: &str) -> Result<(), ConversionError> {
+        let mut map = Map::new();
+
+        map.insert("log".to_string(), self.log.clone());
+        map.insert("dns".to_string(), self.dns.clone());
+        map.insert("ntp".to_string(), self.ntp.clone());
+        map.insert("endpoints".to_string(), Value::Array(self.endpoints.clone()));
+        map.insert("inbounds".to_string(), Value::Array(self.inbounds.clone()));
+        map.insert("outbounds".to_string(), Value::Array(self.outbounds.clone()));
+        map.insert("route".to_string(), self.route.clone());
+        map.insert("experimental".to_string(), self.experimental.clone());
+
+        let content = serde_json::to_string_pretty(&Value::Object(map))
+            .map_err(|e| ConversionError::SerializationError(e.to_string()))?;
+
+        fs::write(Path::new(filename), content)
+            .map_err(|e| ConversionError::IoError(e.to_string()))?;
+
+        Ok(())
+    }  
 }
+
+

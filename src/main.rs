@@ -3,6 +3,8 @@ mod error;
 mod protocols;
 mod utils;
 
+use serde_json::json;
+
 use crate::protocols::Protocol;
 
 #[tokio::main]
@@ -17,8 +19,21 @@ async fn main() {
             Ok(protocol) => {
                 let mut config = config::SingBoxConfig::new();
                 config.set_log_level("info");
-                config.add_dns_server("1.1.1.1");
+                
+                // Add DNS servers
+                config.add_dns_server("remote", "8.8.8.8", Some("prefer_ipv4"), Some("proxy"));
+                config.add_dns_server("local", "223.5.5.5", Some("prefer_ipv4"), Some("direct"));
+                config.add_dns_server("block", "rcode://success", None, None);
+
+                // Add DNS rules
+                config.add_dns_rule(vec!["geosite-cn", "geosite-geolocation-cn"], "local");
+                config.add_dns_rule(vec!["geosite-category-ads-all"], "block");
+
+                // Set final DNS server
+                config.set_dns_final("remote");
                 config.add_default_inbound();
+
+
                 config.add_outbound(&protocol);        
                 let filename = format!("config_{}_{}.json", protocol.get_type(), chrono::Local::now().timestamp());
                 if let Err(e) = config.save_to_file(&filename) {
