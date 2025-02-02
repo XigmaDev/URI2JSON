@@ -29,7 +29,6 @@ pub enum Protocol {
         host: String,
         port: u16,
         flow: Option<String>,
-        encryption: String,
         transport: TransportConfig,
         tls: TlsConfig,
     },
@@ -160,10 +159,6 @@ impl Protocol {
             host: url.host_str().ok_or("Missing host")?.to_string(),
             port: url.port().ok_or("Missing port")?,
             flow: query.remove("flow").map(|v| v.to_string()),
-            encryption: query
-                .remove("encryption")
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "none".to_string()),
             transport: parse_transport(&mut query),
             tls: parse_tls(&mut query),
         })
@@ -257,7 +252,6 @@ impl Protocol {
                 host,
                 port,
                 flow,
-                encryption,
                 transport,
                 tls
             } => {
@@ -267,7 +261,6 @@ impl Protocol {
                     "server": host,
                     "server_port": port,
                     "uuid": uuid,
-                    "encryption": encryption,
                     "transport": transport.to_config(),
                 });
 
