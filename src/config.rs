@@ -9,7 +9,7 @@ use crate::Protocol;
 pub struct SingBoxConfig {
     log: Value,
     dns: Value,
-    ntp: Value,
+    //ntp: Value,
     endpoints: Vec<Value>,
     inbounds: Vec<Value>,
     outbounds: Vec<Value>,
@@ -26,7 +26,7 @@ impl SingBoxConfig {
                 "rules": [],
                 "final": "remote"
             }),
-            ntp: json!({}),
+            //ntp: json!({}),
             endpoints: Vec::new(),
             inbounds: Vec::new(),
             outbounds: Vec::new(),
@@ -203,7 +203,7 @@ impl SingBoxConfig {
 
         map.insert("log".to_string(), self.log.clone());
         map.insert("dns".to_string(), self.dns.clone());
-        map.insert("ntp".to_string(), self.ntp.clone());
+        //map.insert("ntp".to_string(), self.ntp.clone());
         map.insert("endpoints".to_string(), Value::Array(self.endpoints.clone()));
         map.insert("inbounds".to_string(), Value::Array(self.inbounds.clone()));
         map.insert("outbounds".to_string(), Value::Array(self.outbounds.clone()));
