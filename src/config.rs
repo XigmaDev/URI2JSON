@@ -57,7 +57,8 @@ impl SingBoxConfig {
             "tag": "mixed-in",
             "listen": "::",
             "listen_port": 1080,
-            "sniff": true
+            "sniff": true,
+            "sniff_override_destination": true,
         }));
     }
 
