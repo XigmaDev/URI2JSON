@@ -2,11 +2,13 @@ use serde_json::{json,Map, Value};
 use std::fs;
 use std::path::Path;
 use crate::error::ConversionError;
-use crate::Protocol;
+use crate::protocols::{Protocol, ConfigType};
+use semver::Version;
 
 
 #[derive(Debug)]
 pub struct SingBoxConfig {
+    version: Version,
     log: Value,
     dns: Value,
     //ntp: Value,
@@ -18,13 +20,15 @@ pub struct SingBoxConfig {
 }
 
 impl SingBoxConfig {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(version: String) -> Result<Self, ConversionError> {
+        let version = Version::parse(&version).map_err(|e| ConversionError::InvalidVersion(e.to_string()))?;
+        
+        Ok(Self {
+            version,
             log: json!({}),
             dns: json!({
                 "servers": [],
                 "rules": [],
-                "final": "remote"
             }),
             //ntp: json!({}),
             endpoints: Vec::new(),
@@ -32,7 +36,7 @@ impl SingBoxConfig {
             outbounds: Vec::new(),
             route: json!({}),
             experimental: json!({}),
-        }
+        })
     }
 
     // {
@@ -45,7 +49,6 @@ impl SingBoxConfig {
     // }
     pub fn set_log_level(&mut self, level: &str) {
         self.log = json!({
-            "disabled": false,
             "level": level,
             "timestamp": true
         });
@@ -62,12 +65,28 @@ impl SingBoxConfig {
         }));
     }
 
-    pub fn add_outbound(&mut self, protocol: &Protocol) {
-        self.outbounds.push(protocol.to_singbox_outbound());
-        self.outbounds.push(json!({
-            "type": "direct",
-            "tag": "direct"
-        }));
+    pub fn add_outbound(&mut self, protocol: Protocol) -> Result<(), ConversionError> {
+        match protocol.to_singbox_outbound(&self.version)? {
+            ConfigType::Endpoint(endpoint) => {
+                self.endpoints.push(endpoint);
+            }
+            ConfigType::Outbound(outbound) => {
+                self.outbounds.push(outbound);
+                self.outbounds.push(json!({
+                    "type": "direct",
+                    "tag": "direct",
+                }));
+                self.outbounds.push(json!({
+                    "type": "block",
+                    "tag": "block",
+                }));
+                self.outbounds.push(json!({
+                    "type": "dns",
+                    "tag": "dns-out",
+                }));
+            }
+        }
+        Ok(())
     }
     // {
     //     "dns": {
@@ -84,85 +103,18 @@ impl SingBoxConfig {
     //       "fakeip": {}
     //     }
     //   }
-    //Example:
-    // {
-    //     "servers": [
-    //       {
-    //         "tag": "remote",
-    //         "address": "8.8.8.8",
-    //         "strategy": "prefer_ipv4",
-    //         "detour": "proxy"
-    //       },
-    //       {
-    //         "tag": "local",
-    //         "address": "223.5.5.5",
-    //         "strategy": "prefer_ipv4",
-    //         "detour": "direct"
-    //       },
-    //       {
-    //         "tag": "block",
-    //         "address": "rcode://success"
-    //       }
-    //     ],
-    //     "rules": [
-    //       {
-    //         "rule_set": [
-    //           "geosite-cn",
-    //           "geosite-geolocation-cn"
-    //         ],
-    //         "server": "local"
-    //       },
-    //       {
-    //         "rule_set": [
-    //           "geosite-category-ads-all"
-    //         ],
-    //         "server": "block"
-    //       }
-    //     ],
-    //     "final": "remote"
-    //   }
 
-    pub fn add_dns_server(&mut self, tag: &str, address: &str, strategy: Option<&str>, detour: Option<&str>) {
-        let mut server = serde_json::Map::new();
-        server.insert("tag".into(), tag.into());
-        server.insert("address".into(), address.into());
-        
-        if let Some(s) = strategy {
-            server.insert("strategy".into(), s.into());
-        }
-        
-        if let Some(d) = detour {
-            server.insert("detour".into(), d.into());
-        }
 
+    pub fn add_dns_server(&mut self, type_: &str, server: &str) {
         if let Value::Object(ref mut dns) = self.dns {
             if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
-                servers.push(Value::Object(server));
+                servers.push(json!({
+                    "type": type_,
+                    "server": server
+                }));
             }
         }
     }
-
-    pub fn add_dns_rule(&mut self, rule_sets: Vec<&str>, server_tag: &str) {
-        let mut rule = serde_json::Map::new();
-        rule.insert(
-            "rule_set".into(),
-            Value::Array(rule_sets.iter().map(|s| Value::String(s.to_string())).collect())
-        );
-        rule.insert("server".into(), server_tag.into());
-
-        if let Value::Object(ref mut dns) = self.dns {
-            if let Some(Value::Array(ref mut rules)) = dns.get_mut("rules") {
-                rules.push(Value::Object(rule));
-            }
-        }
-    }
-
-    pub fn set_dns_final(&mut self, final_server: &str) {
-        if let Value::Object(ref mut dns) = self.dns {
-            dns.insert("final".into(), Value::String(final_server.to_string()));
-        }
-    }
-
 
       // {
     //     "route": {
@@ -194,7 +146,13 @@ impl SingBoxConfig {
         });
     }
 
-
+    pub fn add_default_experimental(&mut self) {
+        self.experimental = json!({
+            "cache_file": {
+            "enabled": true
+            },
+        });
+    }
 
 
     

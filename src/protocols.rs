@@ -2,9 +2,16 @@ use serde_json::{json, Value};
 use url::Url;
 use std::collections::HashMap;
 use base64::engine::general_purpose;
-use std::str::FromStr;
 use base64::Engine;
+use semver::Version;
+use crate::error::ConversionError;
 
+
+#[derive(Debug)]
+pub enum ConfigType{
+    Endpoint(Value),
+    Outbound(Value),
+}
 #[derive(Debug)]
 pub enum Protocol {
     Shadowsocks{
@@ -47,11 +54,10 @@ pub enum Protocol {
         mtu: Option<u16>,
         ip: String,
     },
-    
 }
 
 #[derive(Debug, Default)]
-struct TransportConfig {
+pub struct TransportConfig {
     network: String,
     path: Option<String>,
     host: Option<String>,
@@ -64,7 +70,7 @@ struct TransportConfig {
 
 
 #[derive(Debug, Default)]
-struct TlsConfig{
+pub struct TlsConfig{
     enabled: bool,
     insecure: bool,
     sni: Option<String>,
@@ -73,28 +79,26 @@ struct TlsConfig{
     reality: Option<RealityConfig>,
 }
 #[derive(Debug)]
-struct RealityConfig {
+pub struct RealityConfig {
     public_key: String,
     short_id: String,
 }
 
 
 
-impl FromStr for Protocol {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (scheme,content) = s
+impl Protocol {
+    pub fn parse_uri(uri: &str) -> Result<Self, ConversionError> {
+        let (scheme, content) = uri
             .split_once("://")
-            .ok_or_else(||"Invalid URI format".to_string())?;
+            .ok_or(ConversionError::InvalidUri)?;
 
         match scheme {
             "ss" => Self::parse_shadowsocks(content),
             "vmess" => Self::parse_vmess(content),
             "vless" => Self::parse_vless(content),
             "trojan" => Self::parse_trojan(content),
-            "wg" => Self::parse_wireguard(content),
-            _ => Err(format!("Unsupported protocol: {}", scheme)),
+            "wireguard" => Self::parse_wireguard(content),
+            _ => Err(ConversionError::UnsupportedProtocol(scheme.to_string())),
         }
     }
 }
@@ -111,35 +115,34 @@ impl Protocol {
         }
     }
 
-    fn parse_shadowsocks(data: &str) -> Result<Self, String> {
-        let url = Url::parse(&format!("ss://{}", data)).map_err(|e| e.to_string())?;
+    fn parse_shadowsocks(data: &str) -> Result<Self, ConversionError> {
+        let url = Url::parse(&format!("ss://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
         Ok(Self::Shadowsocks{
             method: url.username().to_string(),
-            password: url.password().ok_or("Missing password")?.to_string(),
-            host: url.host_str().ok_or("Missing host")?.to_string(),
-            port: url.port().ok_or("Missing port")?,
+            password: url.password().ok_or(ConversionError::MissingPassword)?.to_string(),
+            host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            port: url.port().ok_or(ConversionError::MissingPort)?,
             plugin: url.query_pairs().find(|(k, _)| k == "plugin").map(|(_, v)| v.to_string()),
             plugin_opts: url.query_pairs().find(|(k, _)| k == "plugin-opts").map(|(_, v)| v.to_string()),
         })
-        
     }
-    fn parse_vmess(data: &str) -> Result<Self, String> {
-        let decoded = general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())?;
-        let vmess: Value = serde_json::from_slice(&decoded).map_err(|e| e.to_string())?;
+    fn parse_vmess(data: &str) -> Result<Self, ConversionError> {
+        let decoded = general_purpose::STANDARD.decode(data).map_err(|_| ConversionError::FailedDecode)?;
+        let vmess: Value = serde_json::from_slice(&decoded).map_err(|_| ConversionError::InvalidJson)?;
         
         let mut query = vmess.as_object()
-            .ok_or("Invalid vmess format")?
+            .ok_or(ConversionError::InvalidVmessFormat)?
             .iter()
             .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
             .collect::<HashMap<String, String>>();
 
         //parse query params 
         
-        let port = vmess["port"].as_u64().ok_or("Missing port")? as u16;
+        let port = vmess["port"].as_u64().ok_or(ConversionError::MissingPort)? as u16;
 
         Ok(Self::Vmess {
-            uuid: vmess["id"].as_str().ok_or("Missing UUID")?.to_string(),
-            host: vmess["add"].as_str().ok_or("Missing host")?.to_string(),
+            uuid: vmess["id"].as_str().ok_or(ConversionError::MissingUUID)?.to_string(),
+            host: vmess["add"].as_str().ok_or(ConversionError::MissingHost)?.to_string(),
             port,
             alter_id: vmess["aid"].as_str().unwrap_or("0").to_string(),
             security: vmess["security"].as_str().unwrap_or("auto").to_string(),
@@ -148,56 +151,94 @@ impl Protocol {
         })
     }
 
-    fn parse_vless(data: &str) -> Result<Self, String> {
-        let url = Url::parse(&format!("vless://{}", data)).map_err(|e| e.to_string())?;
+    fn parse_vless(data: &str) -> Result<Self, ConversionError> {
+        let url = Url::parse(&format!("vless://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
         let mut query = url.query_pairs()
             .into_owned()
             .collect::<HashMap<String, String>>();
         
         Ok(Self::Vless {
             uuid: url.username().to_string(),
-            host: url.host_str().ok_or("Missing host")?.to_string(),
-            port: url.port().ok_or("Missing port")?,
+            host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            port: url.port().ok_or(ConversionError::MissingPort)?,
             flow: query.remove("flow").map(|v| v.to_string()),
             transport: parse_transport(&mut query),
             tls: parse_tls(&mut query),
         })
     }
 
-    fn parse_trojan(data: &str) -> Result<Self, String> {
-        let url = Url::parse(&format!("trojan://{}", data)).map_err(|e| e.to_string())?;
+    fn parse_trojan(data: &str) -> Result<Self, ConversionError> {
+        let url = Url::parse(&format!("trojan://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
         let mut query = url.query_pairs()
             .into_owned()
             .collect::<HashMap<String, String>>();
         Ok(Self::Trojan {
             password: url.username().to_string(),
-            host: url.host_str().ok_or("Missing host")?.to_string(),
-            port: url.port().ok_or("Missing port")?,
+            host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            port: url.port().ok_or(ConversionError::MissingPort)?,
             transport: parse_transport(&mut query),
             tls: parse_tls(&mut query),
         })
     }
 
-    fn parse_wireguard(data: &str) -> Result<Self, String> {
-        let url = Url::parse(&format!("wg://{}", data)).map_err(|e| e.to_string())?;
+    fn parse_wireguard(data: &str) -> Result<Self, ConversionError> {
+        let url = Url::parse(&format!("wireguard://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
         let query = url.query_pairs().collect::<HashMap<_, _>>();
         
         Ok(Self::Wireguard {
             private_key: url.username().to_string(),
-            public_key: query.get("pubkey").ok_or("Missing public key")?.to_string(),
+            public_key: query.get("publickey").ok_or(ConversionError::MissingPublicKey)?.to_string(),
             endpoint: format!(
                 "{}:{}",
-                url.host_str().ok_or("Missing host")?,
-                url.port().ok_or("Missing port")?
+                url.host_str().ok_or(ConversionError::MissingHost)?,
+                url.port().ok_or(ConversionError::MissingPort)?
             ),
             dns: query.get("dns").map(|s| s.to_string()),
             mtu: query.get("mtu").map(|s| s.parse().unwrap()),
-            ip: query.get("ip").ok_or("Missing IP")?.to_string(),
+            ip: query.get("ip").ok_or(ConversionError::MissingIP)?.to_string(),
         })
     }
 
 
-    pub fn to_singbox_outbound(&self) -> Value {
+    pub fn to_singbox_outbound(&self, version: &Version) -> Result<ConfigType, ConversionError> {
+        match self {
+            Self::Wireguard {
+                private_key,
+                public_key,
+                endpoint,
+                dns,
+                mtu,
+                ip,
+            } => {
+                if version >= &Version::new(1, 11, 0) {
+                    Ok(ConfigType::Endpoint(json!({
+                        "type": "wireguard",
+                        "tag": "wg-endpoint",
+                        "local_address": [ip],
+                        "private_key": private_key,
+                        "peer_public_key": public_key,
+                        "server": endpoint,
+                        "mtu": mtu,
+                        "dns": dns,
+                    })))
+                } else {
+                    Ok(ConfigType::Outbound(json!({
+                        "type": "wireguard",
+                        "local_address": [ip],
+                        "private_key": private_key,
+                        "peer_public_key": public_key,
+                        "endpoint": endpoint,
+                        "mtu": mtu,
+                        "dns": dns,
+                    })))
+                }
+            }
+            _ => Ok(ConfigType::Outbound(self.to_legacy_singbox_outbound())),
+        }
+    }
+
+
+    pub fn to_legacy_singbox_outbound(&self) -> Value {
         match self {
             Self::Shadowsocks {
                 method,
@@ -323,7 +364,7 @@ impl Protocol {
 
 fn parse_transport(query: &mut HashMap<String, String>) -> TransportConfig {
     let mut transport = TransportConfig {
-        network: query.remove("type").unwrap_or_else(|| "tcp".to_string()),
+        network: query.remove("type").expect("Missing network type"),
         path: query.remove("path").or_else(|| query.remove("serviceName")),
         host: query.remove("host").or_else(|| query.remove("sni")),
         headers: parse_headers(query.remove("headers")),

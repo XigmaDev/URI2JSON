@@ -7,6 +7,18 @@ pub enum ConversionError {
     ParseError(String),
     SerializationError(String),
     IoError(String),
+    UnsupportedFeature(String),
+    InvalidVersion(String),
+    MissingPassword,
+    MissingHost,
+    MissingPort,
+    MissingUUID,
+    MissingIP,
+    MissingPublicKey,
+    FailedDecode,
+    InvalidVmessFormat,
+    InvalidJson,
+
 }
 
 impl fmt::Display for ConversionError {
@@ -17,6 +29,18 @@ impl fmt::Display for ConversionError {
             Self::ParseError(e) => write!(f, "Parse error: {}", e),
             Self::SerializationError(e) => write!(f, "Serialization error: {}", e),
             Self::IoError(e) => write!(f, "IO error: {}", e),
+            Self::UnsupportedFeature(e) => write!(f, "Unsupported feature: {}", e),
+            Self::InvalidVersion(e) => write!(f, "Invalid version: {}", e),
+            Self::MissingPassword => write!(f, "Missing password"),
+            Self::MissingHost => write!(f, "Missing host"),
+            Self::MissingPort => write!(f, "Missing port"),
+            Self::MissingUUID => write!(f, "Missing UUID"),
+            Self::MissingIP => write!(f, "Missing IP"),
+            Self::MissingPublicKey => write!(f, "Missing public key"),
+            Self::FailedDecode => write!(f, "Failed to decode base64"),
+            Self::InvalidVmessFormat => write!(f, "Invalid Vmess format"),
+            Self::InvalidJson => write!(f, "Invalid JSON"),
+
         }
     }
 }
