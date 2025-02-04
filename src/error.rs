@@ -18,6 +18,9 @@ pub enum ConversionError {
     FailedDecode,
     InvalidVmessFormat,
     InvalidJson,
+    MissingField(&'static str),
+    InvalidTransportType(String),
+    
 
 }
 
@@ -40,6 +43,8 @@ impl fmt::Display for ConversionError {
             Self::FailedDecode => write!(f, "Failed to decode base64"),
             Self::InvalidVmessFormat => write!(f, "Invalid Vmess format"),
             Self::InvalidJson => write!(f, "Invalid JSON"),
+            Self::MissingField(field) => write!(f, "Missing field: {}", field),
+            Self::InvalidTransportType(t) => write!(f, "Invalid transport type: {}", t),
 
         }
     }

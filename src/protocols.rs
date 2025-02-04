@@ -5,13 +5,14 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use semver::Version;
 use crate::error::ConversionError;
-
+use crate::transport;
 
 #[derive(Debug)]
 pub enum ConfigType{
     Endpoint(Value),
     Outbound(Value),
 }
+
 #[derive(Debug)]
 pub enum Protocol {
     Shadowsocks{
@@ -28,7 +29,7 @@ pub enum Protocol {
         port: u16,
         alter_id: String,
         security: String,
-        transport: TransportConfig,
+        transport: transport::TransportConfig,
         tls: TlsConfig,
     },
     Vless{
@@ -36,14 +37,14 @@ pub enum Protocol {
         host: String,
         port: u16,
         flow: Option<String>,
-        transport: TransportConfig,
+        transport: transport::TransportConfig,
         tls: TlsConfig,
     },
     Trojan{
         password: String,
         host: String,
         port: u16,
-        transport: TransportConfig,
+        transport: transport::TransportConfig,
         tls: TlsConfig,
     },
     Wireguard{
@@ -55,19 +56,6 @@ pub enum Protocol {
         ip: String,
     },
 }
-
-#[derive(Debug, Default)]
-pub struct TransportConfig {
-    network: String,
-    path: Option<String>,
-    host: Option<String>,
-    headers: HashMap<String, String>,
-    service_name: Option<String>,
-    quic_security: Option<String>,
-    key: Option<String>,
-    mode: Option<String>,
-}
-
 
 #[derive(Debug, Default)]
 pub struct TlsConfig{
@@ -146,7 +134,7 @@ impl Protocol {
             port,
             alter_id: vmess["aid"].as_str().unwrap_or("0").to_string(),
             security: vmess["security"].as_str().unwrap_or("auto").to_string(),
-            transport: parse_transport(&mut query),
+            transport: parse_transport(&mut query)?,
             tls: parse_tls(&mut query),
         })
     }
@@ -162,7 +150,7 @@ impl Protocol {
             host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
             port: url.port().ok_or(ConversionError::MissingPort)?,
             flow: query.remove("flow").map(|v| v.to_string()),
-            transport: parse_transport(&mut query),
+            transport: parse_transport(&mut query)?,
             tls: parse_tls(&mut query),
         })
     }
@@ -176,7 +164,7 @@ impl Protocol {
             password: url.username().to_string(),
             host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
             port: url.port().ok_or(ConversionError::MissingPort)?,
-            transport: parse_transport(&mut query),
+            transport: parse_transport(&mut query)?,
             tls: parse_tls(&mut query),
         })
     }
@@ -222,15 +210,7 @@ impl Protocol {
                         "dns": dns,
                     })))
                 } else {
-                    Ok(ConfigType::Outbound(json!({
-                        "type": "wireguard",
-                        "local_address": [ip],
-                        "private_key": private_key,
-                        "peer_public_key": public_key,
-                        "endpoint": endpoint,
-                        "mtu": mtu,
-                        "dns": dns,
-                    })))
+                    Ok(ConfigType::Outbound(self.to_legacy_singbox_outbound()))
                 }
             }
             _ => Ok(ConfigType::Outbound(self.to_legacy_singbox_outbound())),
@@ -346,6 +326,7 @@ impl Protocol {
             } => {
                 let config = json!({
                     "type": "wireguard",
+                    "tag": "wireguard-out",
                     "local_address": [ip],
                     "private_key": private_key,
                     "peer_public_key": public_key,
@@ -362,28 +343,75 @@ impl Protocol {
 
 
 
-fn parse_transport(query: &mut HashMap<String, String>) -> TransportConfig {
-    let mut transport = TransportConfig {
-        network: query.remove("type").expect("Missing network type"),
-        path: query.remove("path").or_else(|| query.remove("serviceName")),
-        host: query.remove("host").or_else(|| query.remove("sni")),
-        headers: parse_headers(query.remove("headers")),
-        service_name: query.remove("serviceName"),
-        quic_security: query.remove("quicSecurity"),
-        key: query.remove("key"),
-        mode: query.remove("mode"),
-    };
+fn parse_transport(query: &mut HashMap<String, String>) -> Result<transport::TransportConfig, ConversionError> {
+    let transport_type = query.remove("type")
+        .ok_or(ConversionError::MissingField("type"))?
+        .to_lowercase();
 
-    // Handle HTTP upgrade
-    if transport.network == "http" {
-        if let Some(path) = &transport.path {
-            if !path.starts_with('/') {
-                transport.path = Some(format!("/{}", path));
-            }
+    match transport_type.as_str() {
+        "http" => {
+            let host = query.remove("host")
+                .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_else(Vec::new);
+            
+            let path = query.remove("path")
+                .map(|mut p| {
+                    if !p.starts_with('/') {
+                        p.insert(0, '/');
+                    }
+                    p
+                })
+                .unwrap_or_default();
+
+            Ok(transport::TransportConfig::Http {
+                host,
+                path,
+                method: query.remove("method").unwrap_or_else(|| "GET".to_string()),
+                headers: parse_headers(query.remove("headers")),
+                idle_timeout: query.remove("idle_timeout").unwrap_or_else(|| "15s".to_string()),
+                ping_timeout: query.remove("ping_timeout").unwrap_or_else(|| "15s".to_string()),
+            })
         }
-    }
+        "ws" | "websocket" => {
+            Ok(transport::TransportConfig::Websocket {
+                path: query.remove("path").unwrap_or_default(),
+                headers: parse_headers(query.remove("headers")),
+                max_early_data: query.remove("max_early_data")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
+                early_data_header_name: query.remove("early_data_header_name").unwrap_or_default(),
+            })
+        }
+        "quic" => {
+            Ok(transport::TransportConfig::Quic)
+        }
+        "tcp" => {
+            Ok(transport::TransportConfig::TCP)
+        }
+        "grpc" => {
+            Ok(transport::TransportConfig::Grpc {
+                service_name: query.remove("service_name").unwrap_or_default(),
+                idle_timeout: query.remove("idle_timeout").unwrap_or_else(|| "15s".to_string()),
+                ping_timeout: query.remove("ping_timeout").unwrap_or_else(|| "15s".to_string()),
+                permit_without_stream: query.remove("permit_without_stream")
+                    .map(|s| s == "true")
+                    .unwrap_or(false),
+            })
+        }
+        "httpupgrade" => {
+            let mut path = query.remove("path").unwrap_or_default();
+            if !path.is_empty() && !path.starts_with('/') {
+                path.insert(0, '/');
+            }
 
-    transport
+            Ok(transport::TransportConfig::Httpupgrade {
+                host: query.remove("host").unwrap_or_default(),
+                path,
+                headers: parse_headers(query.remove("headers")),
+            })
+        }
+        _ => Err(ConversionError::InvalidTransportType(transport_type)),
+    }
 }
 
 fn parse_tls(query: &mut HashMap<String, String>) -> TlsConfig {
@@ -423,48 +451,6 @@ fn parse_headers(header_str: Option<String>) -> HashMap<String, String> {
             .collect()
     }).unwrap_or_default()
 }
-
-impl TransportConfig {
-    fn to_config(&self) -> Value {
-        match self.network.as_str() {
-            "ws" => json!({
-                "type": "ws",
-                "path": self.path,
-                "headers": self.headers,
-                "max_early_data": 0,
-                "early_data_header_name": ""              
-            }),
-            "http" => json!({
-                "type": "http",
-                "path": self.path,
-                "host": self.host,
-                "method": self.mode,
-                "headers": self.headers,
-                "idle_timeout": "15s",
-                "ping_timeout": "15s"
-            }),
-            "quic" => json!({
-                "type": "quic",
-                //No additional encryption support: It's basically duplicate encryption. And Xray-core is not compatible with v2ray-core in here.
-            }),
-            "grpc" => json!({
-                "type": "grpc",
-                "service_name": self.service_name,
-                "idle_timeout": "15s",
-                "ping_timeout": "15s",
-                "permit_without_stream": false
-            }),
-            "httpupgrade" => json!({
-                "type": "httpupgrade",
-                "host": self.host,
-                "path": self.path,
-                "headers": self.headers
-            }),
-            _ => json!({"type": self.network}),
-        }
-    }
-}
-
 impl TlsConfig {
     fn to_config(&self) -> Value {
         let mut config = json!({
