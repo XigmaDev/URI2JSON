@@ -1,15 +1,8 @@
-mod config;
-mod error;
-mod protocols;
-mod utils;
-mod transport;
 use std::thread::sleep;
 use serde_json::json;
+use singbox::protocol::Protocol;
+use singbox::config; 
 
-
-
-
-use crate::protocols::Protocol;
 
 #[tokio::main]
 async fn main() {
@@ -53,7 +46,7 @@ async fn main() {
 
                 config.add_default_experimental();
 
-                let filename = format!("config_{}.json",
+                let filename = format!("GeneratedConfig/config_{}.json",
                 chrono::Local::now().format("%Y%m%d%H%M%S")
                 );
 

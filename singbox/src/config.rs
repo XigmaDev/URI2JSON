@@ -2,7 +2,7 @@ use serde_json::{json,Map, Value};
 use std::fs;
 use std::path::Path;
 use crate::error::ConversionError;
-use crate::protocols::{Protocol, ConfigType};
+use crate::protocol::{Protocol, ConfigType};
 use semver::Version;
 
 

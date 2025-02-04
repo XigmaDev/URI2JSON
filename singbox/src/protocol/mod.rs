@@ -1,3 +1,4 @@
+mod transport;
 use serde_json::{json, Value};
 use url::Url;
 use std::collections::HashMap;
@@ -5,7 +6,6 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use semver::Version;
 use crate::error::ConversionError;
-use crate::transport;
 
 #[derive(Debug)]
 pub enum ConfigType{
