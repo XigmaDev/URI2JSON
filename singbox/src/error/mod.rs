@@ -15,13 +15,12 @@ pub enum ConversionError {
     MissingUUID,
     MissingIP,
     MissingPublicKey,
+    MissingRealityParam(String),
     FailedDecode,
     InvalidVmessFormat,
     InvalidJson,
     MissingField(&'static str),
     InvalidTransportType(String),
-    
-
 }
 
 impl fmt::Display for ConversionError {
@@ -40,6 +39,7 @@ impl fmt::Display for ConversionError {
             Self::MissingUUID => write!(f, "Missing UUID"),
             Self::MissingIP => write!(f, "Missing IP"),
             Self::MissingPublicKey => write!(f, "Missing public key"),
+            Self::MissingRealityParam(p) => write!(f, "Missing reality parameter: {}", p),
             Self::FailedDecode => write!(f, "Failed to decode base64"),
             Self::InvalidVmessFormat => write!(f, "Invalid Vmess format"),
             Self::InvalidJson => write!(f, "Invalid JSON"),

@@ -1,3 +1,4 @@
+mod tls;
 mod transport;
 use serde_json::{json, Value};
 use url::Url;
@@ -30,7 +31,7 @@ pub enum Protocol {
         alter_id: String,
         security: String,
         transport: transport::TransportConfig,
-        tls: TlsConfig,
+        tls: tls::TlsConfig,
     },
     Vless{
         uuid: String,
@@ -38,14 +39,14 @@ pub enum Protocol {
         port: u16,
         flow: Option<String>,
         transport: transport::TransportConfig,
-        tls: TlsConfig,
+        tls: tls::TlsConfig,
     },
     Trojan{
         password: String,
         host: String,
         port: u16,
         transport: transport::TransportConfig,
-        tls: TlsConfig,
+        tls: tls::TlsConfig,
     },
     Wireguard{
         private_key: String,
@@ -56,22 +57,6 @@ pub enum Protocol {
         ip: String,
     },
 }
-
-#[derive(Debug, Default)]
-pub struct TlsConfig{
-    enabled: bool,
-    insecure: bool,
-    sni: Option<String>,
-    alpn:Vec<String>,
-    utls: Option<String>,
-    reality: Option<RealityConfig>,
-}
-#[derive(Debug)]
-pub struct RealityConfig {
-    public_key: String,
-    short_id: String,
-}
-
 
 
 impl Protocol {
@@ -135,7 +120,7 @@ impl Protocol {
             alter_id: vmess["aid"].as_str().unwrap_or("0").to_string(),
             security: vmess["security"].as_str().unwrap_or("auto").to_string(),
             transport: parse_transport(&mut query)?,
-            tls: parse_tls(&mut query),
+            tls: parse_tls(&mut query)?,
         })
     }
 
@@ -151,7 +136,7 @@ impl Protocol {
             port: url.port().ok_or(ConversionError::MissingPort)?,
             flow: query.remove("flow").map(|v| v.to_string()),
             transport: parse_transport(&mut query)?,
-            tls: parse_tls(&mut query),
+            tls: parse_tls(&mut query)?,
         })
     }
 
@@ -165,7 +150,7 @@ impl Protocol {
             host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
             port: url.port().ok_or(ConversionError::MissingPort)?,
             transport: parse_transport(&mut query)?,
-            tls: parse_tls(&mut query),
+            tls: parse_tls(&mut query)?,
         })
     }
 
@@ -414,9 +399,9 @@ fn parse_transport(query: &mut HashMap<String, String>) -> Result<transport::Tra
     }
 }
 
-fn parse_tls(query: &mut HashMap<String, String>) -> TlsConfig {
+fn parse_tls(query: &mut HashMap<String, String>) -> Result<tls::TlsConfig, ConversionError> {
     let security = query.remove("security").unwrap_or_default();
-    let mut tls = TlsConfig::default();
+    let mut tls = tls::TlsConfig::default();
 
     if security == "tls" || security == "reality" {
         tls.enabled = true;
@@ -424,18 +409,20 @@ fn parse_tls(query: &mut HashMap<String, String>) -> TlsConfig {
         tls.insecure = false;
         tls.insecure = query.remove("insecure").is_some();
         tls.alpn = query.remove("alpn")
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+            .map(|s| s.split(',').map(|s| s.trim().to_string().to_lowercase()).collect())
             .unwrap_or_default();
-
+        tls.utls = Some(tls::UTlsConfig {
+            enabled: true,
+            fingerprint: query.remove("fp").unwrap_or("chrome".to_string()),
+        });
         if security == "reality" {
-            tls.reality = Some(RealityConfig {
-                public_key: query.remove("pbk").expect("Missing reality public key"),
-                short_id: query.remove("sid").expect("Missing reality short id"),
+            tls.reality = Some(tls::RealityConfig {
+                public_key: query.remove("pbk") .ok_or(ConversionError::MissingRealityParam("pbk".to_string()))?,
+                short_id: query.remove("sid").ok_or(ConversionError::MissingRealityParam("sid".to_string()))?,
             });
         }
     }
-
-    tls
+    Ok(tls)
 }
 
 fn parse_headers(header_str: Option<String>) -> HashMap<String, String> {
@@ -450,25 +437,6 @@ fn parse_headers(header_str: Option<String>) -> HashMap<String, String> {
             })
             .collect()
     }).unwrap_or_default()
-}
-impl TlsConfig {
-    fn to_config(&self) -> Value {
-        let mut config = json!({
-            "enabled": self.enabled,
-            "server_name": self.sni,
-            "alpn": self.alpn
-        });
-
-        if let Some(reality) = &self.reality {
-            config["reality"] = json!({
-                "enabled": true,
-                "public_key": reality.public_key,
-                "short_id": reality.short_id
-            });
-        }
-
-        config
-    }
 }
 
 

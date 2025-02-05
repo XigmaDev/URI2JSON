@@ -1,4 +1,3 @@
-use std::thread::sleep;
 use serde_json::json;
 use singbox::protocol::Protocol;
 use singbox::config; 
