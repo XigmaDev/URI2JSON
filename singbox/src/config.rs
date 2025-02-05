@@ -104,14 +104,65 @@ impl SingBoxConfig {
     //     }
     //   }
 
+    pub fn add_dns_server(
+        &mut self,
+        type_: &str,
+        server: &str,
+        tag: Option<&str>,
+        detour: Option<&str>
+    ) {
+        if self.version >= Version::new(1, 12, 0) {
+            // Version 1.12+ format
+            if let Value::Object(ref mut dns) = self.dns {
+                if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
+                    if tag.is_some_and(|t| t == "local") {
+                        servers.push(json!({
+                            "type": tag,
+                        }));
+                    }else{
+                        servers.push(json!({
+                            "type": type_,
+                            "server": server
+                        }));
+                    }
+                }
+            }
+        } else {
+            // Legacy version format
+            let address = if type_.is_empty() {
+                server.to_string()
+            } else {
+                format!("{}://{}", type_, server)
+            };
 
-    pub fn add_dns_server(&mut self, type_: &str, server: &str) {
-        if let Value::Object(ref mut dns) = self.dns {
-            if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
-                servers.push(json!({
-                    "type": type_,
-                    "server": server
-                }));
+            let mut server_entry = json!({ "address": address });
+            
+            if let Some(t) = tag {
+                server_entry["tag"] = json!(t);
+            }
+            
+            if let Some(d) = detour {
+                server_entry["detour"] = json!(d);
+            }
+
+            if let Value::Object(ref mut dns) = self.dns {
+                if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
+                    servers.push(server_entry);
+                }
+            }
+        }
+    }
+
+    pub fn add_dns_rule(&mut self, outbound: &str, server_tag: &str) {
+        if self.version < Version::new(1, 12, 0) {
+            if let Value::Object(ref mut dns) = self.dns {
+                let rules = dns.entry("rules").or_insert_with(|| Value::Array(Vec::new()));
+                if let Value::Array(ref mut rules) = rules {
+                    rules.push(json!({
+                        "outbound": outbound,
+                        "server": server_tag
+                    }));
+                }
             }
         }
     }
@@ -146,6 +197,12 @@ impl SingBoxConfig {
         });
     }
 
+
+
+
+
+
+    
     pub fn add_default_experimental(&mut self) {
         self.experimental = json!({
             "cache_file": {
