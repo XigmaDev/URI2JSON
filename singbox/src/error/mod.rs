@@ -20,7 +20,10 @@ pub enum ConversionError {
     InvalidVmessFormat,
     InvalidJson,
     MissingField(&'static str),
-    InvalidTransportType(String),
+    InvalidTransportType(String), 
+    InvalidDnsObject, 
+    MissingServersArray,
+    MissingTypeField,
 }
 
 impl fmt::Display for ConversionError {
@@ -45,6 +48,9 @@ impl fmt::Display for ConversionError {
             Self::InvalidJson => write!(f, "Invalid JSON"),
             Self::MissingField(field) => write!(f, "Missing field: {}", field),
             Self::InvalidTransportType(t) => write!(f, "Invalid transport type: {}", t),
+            Self::InvalidDnsObject => write!(f, "DNS configuration is not a valid object"),
+            Self::MissingServersArray => write!(f, "Missing or invalid 'servers' array in DNS configuration"),
+            Self::MissingTypeField => write!(f, "Missing type field"),
 
         }
     }
