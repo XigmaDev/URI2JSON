@@ -1,19 +1,20 @@
 [package]
-name = "singbox"
+name = "bot"
 version = "0.1.0"
 edition = "2021"
 
 
 [dependencies]
+singbox ={ version = "0.1.0" ,path = "../singbox"}
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
-url = "2.4"
-base64 = "0.22.1"
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
 pretty_env_logger = "0.5"
 dotenv = "0.15.0"
-dptree = "0.3"
+teloxide = { version = "0.13.0", features = ["full"] }
 chrono = "0.4"
 semver = "1.0"
+dptree = "0.3"
+anyhow = "1.0.89"
 cargo-watch = "8.5.3"
