@@ -1,8 +1,8 @@
-use serde::{Serialize, Deserialize};
+use crate::error::ConversionError;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::str::FromStr;
-use serde_json::{Value, json};
-use crate::error::ConversionError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -79,7 +79,7 @@ impl FromStr for TransportConfig {
 impl TransportConfig {
     pub fn to_config(&self) -> Value {
         match self {
-            TransportConfig::TCP => json!({ }),
+            TransportConfig::TCP => json!({}),
             TransportConfig::Http {
                 host,
                 path,
@@ -96,7 +96,7 @@ impl TransportConfig {
                 "idle_timeout": idle_timeout,
                 "ping_timeout": ping_timeout
             }),
-            
+
             TransportConfig::Websocket {
                 path,
                 headers,
@@ -109,9 +109,9 @@ impl TransportConfig {
                 "max_early_data": max_early_data,
                 "early_data_header_name": early_data_header_name
             }),
-            
+
             TransportConfig::Quic => json!({ "type": "quic" }),
- 
+
             TransportConfig::Grpc {
                 service_name,
                 idle_timeout,
@@ -124,7 +124,7 @@ impl TransportConfig {
                 "ping_timeout": ping_timeout,
                 "permit_without_stream": permit_without_stream
             }),
-            
+
             TransportConfig::Httpupgrade {
                 host,
                 path,

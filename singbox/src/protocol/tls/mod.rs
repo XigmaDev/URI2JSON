@@ -6,25 +6,21 @@ pub struct RealityConfig {
     pub short_id: String,
 }
 
-
 #[derive(Debug)]
 pub struct UTlsConfig {
     pub enabled: bool,
     pub fingerprint: String,
 }
 
-
 #[derive(Debug, Default)]
-pub struct TlsConfig{
+pub struct TlsConfig {
     pub enabled: bool,
     pub insecure: bool,
     pub sni: Option<String>,
-    pub alpn:Vec<String>,
+    pub alpn: Vec<String>,
     pub utls: Option<UTlsConfig>,
     pub reality: Option<RealityConfig>,
 }
-
-
 
 impl TlsConfig {
     pub fn to_config(&self) -> Value {
@@ -50,8 +46,6 @@ impl TlsConfig {
             });
         }
 
-
         config
     }
 }
-

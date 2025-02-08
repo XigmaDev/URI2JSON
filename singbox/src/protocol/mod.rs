@@ -1,22 +1,22 @@
 mod tls;
 mod transport;
-use serde_json::{json, Value};
-use url::Url;
-use std::collections::HashMap;
+use crate::error::ConversionError;
 use base64::engine::general_purpose;
 use base64::Engine;
 use semver::Version;
-use crate::error::ConversionError;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use url::Url;
 
 #[derive(Debug)]
-pub enum ConfigType{
+pub enum ConfigType {
     Endpoint(Value),
     Outbound(Value),
 }
 
 #[derive(Debug)]
 pub enum Protocol {
-    Shadowsocks{
+    Shadowsocks {
         method: String,
         password: String,
         host: String,
@@ -24,7 +24,7 @@ pub enum Protocol {
         plugin: Option<String>,
         plugin_opts: Option<String>,
     },
-    Vmess{
+    Vmess {
         uuid: String,
         host: String,
         port: u16,
@@ -33,7 +33,7 @@ pub enum Protocol {
         transport: transport::TransportConfig,
         tls: tls::TlsConfig,
     },
-    Vless{
+    Vless {
         uuid: String,
         host: String,
         port: u16,
@@ -41,14 +41,14 @@ pub enum Protocol {
         transport: transport::TransportConfig,
         tls: tls::TlsConfig,
     },
-    Trojan{
+    Trojan {
         password: String,
         host: String,
         port: u16,
         transport: transport::TransportConfig,
         tls: tls::TlsConfig,
     },
-    Wireguard{
+    Wireguard {
         private_key: String,
         public_key: String,
         endpoint: String,
@@ -58,12 +58,9 @@ pub enum Protocol {
     },
 }
 
-
 impl Protocol {
     pub fn parse_uri(uri: &str) -> Result<Self, ConversionError> {
-        let (scheme, content) = uri
-            .split_once("://")
-            .ok_or(ConversionError::InvalidUri)?;
+        let (scheme, content) = uri.split_once("://").ok_or(ConversionError::InvalidUri)?;
 
         match scheme {
             "ss" => Self::parse_shadowsocks(content),
@@ -76,46 +73,67 @@ impl Protocol {
     }
 }
 
-
 impl Protocol {
     pub fn get_type(&self) -> &str {
         match self {
-            Self::Shadowsocks {..} => "Shadowsocks",
-            Self::Vmess {..} => "Vmess",
-            Self::Vless {..} => "Vless",
-            Self::Trojan {..} => "Trojan",
-            Self::Wireguard {..} => "Wireguard",
+            Self::Shadowsocks { .. } => "Shadowsocks",
+            Self::Vmess { .. } => "Vmess",
+            Self::Vless { .. } => "Vless",
+            Self::Trojan { .. } => "Trojan",
+            Self::Wireguard { .. } => "Wireguard",
         }
     }
 
     fn parse_shadowsocks(data: &str) -> Result<Self, ConversionError> {
         let url = Url::parse(&format!("ss://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
-        Ok(Self::Shadowsocks{
+        Ok(Self::Shadowsocks {
             method: url.username().to_string(),
-            password: url.password().ok_or(ConversionError::MissingPassword)?.to_string(),
-            host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            password: url
+                .password()
+                .ok_or(ConversionError::MissingPassword)?
+                .to_string(),
+            host: url
+                .host_str()
+                .ok_or(ConversionError::MissingHost)?
+                .to_string(),
             port: url.port().ok_or(ConversionError::MissingPort)?,
-            plugin: url.query_pairs().find(|(k, _)| k == "plugin").map(|(_, v)| v.to_string()),
-            plugin_opts: url.query_pairs().find(|(k, _)| k == "plugin-opts").map(|(_, v)| v.to_string()),
+            plugin: url
+                .query_pairs()
+                .find(|(k, _)| k == "plugin")
+                .map(|(_, v)| v.to_string()),
+            plugin_opts: url
+                .query_pairs()
+                .find(|(k, _)| k == "plugin-opts")
+                .map(|(_, v)| v.to_string()),
         })
     }
     fn parse_vmess(data: &str) -> Result<Self, ConversionError> {
-        let decoded = general_purpose::STANDARD.decode(data).map_err(|_| ConversionError::FailedDecode)?;
-        let vmess: Value = serde_json::from_slice(&decoded).map_err(|_| ConversionError::InvalidJson)?;
-        
-        let mut query = vmess.as_object()
+        let decoded = general_purpose::STANDARD
+            .decode(data)
+            .map_err(|_| ConversionError::FailedDecode)?;
+        let vmess: Value =
+            serde_json::from_slice(&decoded).map_err(|_| ConversionError::InvalidJson)?;
+
+        let mut query = vmess
+            .as_object()
             .ok_or(ConversionError::InvalidVmessFormat)?
             .iter()
             .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
             .collect::<HashMap<String, String>>();
 
-        //parse query params 
-        
+        //parse query params
+
         let port = vmess["port"].as_u64().ok_or(ConversionError::MissingPort)? as u16;
 
         Ok(Self::Vmess {
-            uuid: vmess["id"].as_str().ok_or(ConversionError::MissingUUID)?.to_string(),
-            host: vmess["add"].as_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            uuid: vmess["id"]
+                .as_str()
+                .ok_or(ConversionError::MissingUUID)?
+                .to_string(),
+            host: vmess["add"]
+                .as_str()
+                .ok_or(ConversionError::MissingHost)?
+                .to_string(),
             port,
             alter_id: vmess["aid"].as_str().unwrap_or("0").to_string(),
             security: vmess["security"].as_str().unwrap_or("auto").to_string(),
@@ -125,14 +143,19 @@ impl Protocol {
     }
 
     fn parse_vless(data: &str) -> Result<Self, ConversionError> {
-        let url = Url::parse(&format!("vless://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
-        let mut query = url.query_pairs()
+        let url =
+            Url::parse(&format!("vless://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
+        let mut query = url
+            .query_pairs()
             .into_owned()
             .collect::<HashMap<String, String>>();
-        
+
         Ok(Self::Vless {
             uuid: url.username().to_string(),
-            host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            host: url
+                .host_str()
+                .ok_or(ConversionError::MissingHost)?
+                .to_string(),
             port: url.port().ok_or(ConversionError::MissingPort)?,
             flow: query.remove("flow").map(|v| v.to_string()),
             transport: parse_transport(&mut query)?,
@@ -141,13 +164,18 @@ impl Protocol {
     }
 
     fn parse_trojan(data: &str) -> Result<Self, ConversionError> {
-        let url = Url::parse(&format!("trojan://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
-        let mut query = url.query_pairs()
+        let url =
+            Url::parse(&format!("trojan://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
+        let mut query = url
+            .query_pairs()
             .into_owned()
             .collect::<HashMap<String, String>>();
         Ok(Self::Trojan {
             password: url.username().to_string(),
-            host: url.host_str().ok_or(ConversionError::MissingHost)?.to_string(),
+            host: url
+                .host_str()
+                .ok_or(ConversionError::MissingHost)?
+                .to_string(),
             port: url.port().ok_or(ConversionError::MissingPort)?,
             transport: parse_transport(&mut query)?,
             tls: parse_tls(&mut query)?,
@@ -155,12 +183,16 @@ impl Protocol {
     }
 
     fn parse_wireguard(data: &str) -> Result<Self, ConversionError> {
-        let url = Url::parse(&format!("wireguard://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
+        let url = Url::parse(&format!("wireguard://{}", data))
+            .map_err(|_| ConversionError::InvalidUri)?;
         let query = url.query_pairs().collect::<HashMap<_, _>>();
-        
+
         Ok(Self::Wireguard {
             private_key: url.username().to_string(),
-            public_key: query.get("publickey").ok_or(ConversionError::MissingPublicKey)?.to_string(),
+            public_key: query
+                .get("publickey")
+                .ok_or(ConversionError::MissingPublicKey)?
+                .to_string(),
             endpoint: format!(
                 "{}:{}",
                 url.host_str().ok_or(ConversionError::MissingHost)?,
@@ -168,10 +200,12 @@ impl Protocol {
             ),
             dns: query.get("dns").map(|s| s.to_string()),
             mtu: query.get("mtu").map(|s| s.parse().unwrap()),
-            ip: query.get("ip").ok_or(ConversionError::MissingIP)?.to_string(),
+            ip: query
+                .get("ip")
+                .ok_or(ConversionError::MissingIP)?
+                .to_string(),
         })
     }
-
 
     pub fn to_singbox_outbound(&self, version: &Version) -> Result<ConfigType, ConversionError> {
         match self {
@@ -202,7 +236,6 @@ impl Protocol {
         }
     }
 
-
     pub fn to_legacy_singbox_outbound(&self) -> Value {
         match self {
             Self::Shadowsocks {
@@ -211,23 +244,23 @@ impl Protocol {
                 host,
                 port,
                 plugin,
-                plugin_opts
+                plugin_opts,
             } => {
                 let mut config = json!({
-                "type": "shadowsocks",
-                "server": host,
-                "server_port": port,
-                "method": method,
-                "password": password,
-            });
-            if let Some(plugin) = plugin {
-                config["plugin"] = json!(plugin);
-                if let Some(opts) = plugin_opts {
-                    config["plugin_opts"] = json!(opts);
+                    "type": "shadowsocks",
+                    "server": host,
+                    "server_port": port,
+                    "method": method,
+                    "password": password,
+                });
+                if let Some(plugin) = plugin {
+                    config["plugin"] = json!(plugin);
+                    if let Some(opts) = plugin_opts {
+                        config["plugin_opts"] = json!(opts);
+                    }
                 }
+                config
             }
-            config
-        }
             Self::Vmess {
                 uuid,
                 host,
@@ -237,7 +270,7 @@ impl Protocol {
                 transport,
                 tls,
             } => {
-                let mut config =json!({
+                let mut config = json!({
                     "type": "vmess",
                     "server": host,
                     "server_port": port,
@@ -259,7 +292,7 @@ impl Protocol {
                 port,
                 flow,
                 transport,
-                tls
+                tls,
             } => {
                 let mut config = json!({
                     "type": "vless",
@@ -286,21 +319,21 @@ impl Protocol {
                 host,
                 port,
                 transport,
-                tls
+                tls,
             } => {
                 let mut config = json!({
-                "type": "trojan",
-                "server": host,
-                "server_port": port,
-                "password": password,
-                "transport":transport.to_config(),
-            });
+                    "type": "trojan",
+                    "server": host,
+                    "server_port": port,
+                    "password": password,
+                    "transport":transport.to_config(),
+                });
 
-            if tls.enabled {
-                config["tls"] = tls.to_config();
+                if tls.enabled {
+                    config["tls"] = tls.to_config();
+                }
+                config
             }
-            config
-        }
             Self::Wireguard {
                 private_key,
                 public_key,
@@ -323,23 +356,25 @@ impl Protocol {
             }
         }
     }
-    
 }
 
-
-
-fn parse_transport(query: &mut HashMap<String, String>) -> Result<transport::TransportConfig, ConversionError> {
-    let transport_type = query.remove("type")
+fn parse_transport(
+    query: &mut HashMap<String, String>,
+) -> Result<transport::TransportConfig, ConversionError> {
+    let transport_type = query
+        .remove("type")
         .ok_or(ConversionError::MissingField("type"))?
         .to_lowercase();
 
     match transport_type.as_str() {
         "http" => {
-            let host = query.remove("host")
+            let host = query
+                .remove("host")
                 .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_else(Vec::new);
-            
-            let path = query.remove("path")
+
+            let path = query
+                .remove("path")
                 .map(|mut p| {
                     if !p.starts_with('/') {
                         p.insert(0, '/');
@@ -353,36 +388,38 @@ fn parse_transport(query: &mut HashMap<String, String>) -> Result<transport::Tra
                 path,
                 method: query.remove("method").unwrap_or_else(|| "GET".to_string()),
                 headers: parse_headers(query.remove("headers")),
-                idle_timeout: query.remove("idle_timeout").unwrap_or_else(|| "15s".to_string()),
-                ping_timeout: query.remove("ping_timeout").unwrap_or_else(|| "15s".to_string()),
+                idle_timeout: query
+                    .remove("idle_timeout")
+                    .unwrap_or_else(|| "15s".to_string()),
+                ping_timeout: query
+                    .remove("ping_timeout")
+                    .unwrap_or_else(|| "15s".to_string()),
             })
         }
-        "ws" | "websocket" => {
-            Ok(transport::TransportConfig::Websocket {
-                path: query.remove("path").unwrap_or_default(),
-                headers: parse_headers(query.remove("headers")),
-                max_early_data: query.remove("max_early_data")
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0),
-                early_data_header_name: query.remove("early_data_header_name").unwrap_or_default(),
-            })
-        }
-        "quic" => {
-            Ok(transport::TransportConfig::Quic)
-        }
-        "tcp" => {
-            Ok(transport::TransportConfig::TCP)
-        }
-        "grpc" => {
-            Ok(transport::TransportConfig::Grpc {
-                service_name: query.remove("service_name").unwrap_or_default(),
-                idle_timeout: query.remove("idle_timeout").unwrap_or_else(|| "15s".to_string()),
-                ping_timeout: query.remove("ping_timeout").unwrap_or_else(|| "15s".to_string()),
-                permit_without_stream: query.remove("permit_without_stream")
-                    .map(|s| s == "true")
-                    .unwrap_or(false),
-            })
-        }
+        "ws" | "websocket" => Ok(transport::TransportConfig::Websocket {
+            path: query.remove("path").unwrap_or_default(),
+            headers: parse_headers(query.remove("headers")),
+            max_early_data: query
+                .remove("max_early_data")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
+            early_data_header_name: query.remove("early_data_header_name").unwrap_or_default(),
+        }),
+        "quic" => Ok(transport::TransportConfig::Quic),
+        "tcp" => Ok(transport::TransportConfig::TCP),
+        "grpc" => Ok(transport::TransportConfig::Grpc {
+            service_name: query.remove("service_name").unwrap_or_default(),
+            idle_timeout: query
+                .remove("idle_timeout")
+                .unwrap_or_else(|| "15s".to_string()),
+            ping_timeout: query
+                .remove("ping_timeout")
+                .unwrap_or_else(|| "15s".to_string()),
+            permit_without_stream: query
+                .remove("permit_without_stream")
+                .map(|s| s == "true")
+                .unwrap_or(false),
+        }),
         "httpupgrade" => {
             let mut path = query.remove("path").unwrap_or_default();
             if !path.is_empty() && !path.starts_with('/') {
@@ -408,8 +445,13 @@ fn parse_tls(query: &mut HashMap<String, String>) -> Result<tls::TlsConfig, Conv
         tls.sni = query.remove("sni");
         tls.insecure = false;
         tls.insecure = query.remove("insecure").is_some();
-        tls.alpn = query.remove("alpn")
-            .map(|s| s.split(',').map(|s| s.trim().to_string().to_lowercase()).collect())
+        tls.alpn = query
+            .remove("alpn")
+            .map(|s| {
+                s.split(',')
+                    .map(|s| s.trim().to_string().to_lowercase())
+                    .collect()
+            })
             .unwrap_or_default();
         tls.utls = Some(tls::UTlsConfig {
             enabled: true,
@@ -417,8 +459,12 @@ fn parse_tls(query: &mut HashMap<String, String>) -> Result<tls::TlsConfig, Conv
         });
         if security == "reality" {
             tls.reality = Some(tls::RealityConfig {
-                public_key: query.remove("pbk") .ok_or(ConversionError::MissingRealityParam("pbk".to_string()))?,
-                short_id: query.remove("sid").ok_or(ConversionError::MissingRealityParam("sid".to_string()))?,
+                public_key: query
+                    .remove("pbk")
+                    .ok_or(ConversionError::MissingRealityParam("pbk".to_string()))?,
+                short_id: query
+                    .remove("sid")
+                    .ok_or(ConversionError::MissingRealityParam("sid".to_string()))?,
             });
         }
     }
@@ -426,17 +472,17 @@ fn parse_tls(query: &mut HashMap<String, String>) -> Result<tls::TlsConfig, Conv
 }
 
 fn parse_headers(header_str: Option<String>) -> HashMap<String, String> {
-    header_str.map(|s| {
-        s.split('&')
-            .filter_map(|pair| {
-                let mut parts = pair.splitn(2, '=');
-                match (parts.next(), parts.next()) {
-                    (Some(k), Some(v)) => Some((k.to_string(), v.to_string())),
-                    _ => None,
-                }
-            })
-            .collect()
-    }).unwrap_or_default()
+    header_str
+        .map(|s| {
+            s.split('&')
+                .filter_map(|pair| {
+                    let mut parts = pair.splitn(2, '=');
+                    match (parts.next(), parts.next()) {
+                        (Some(k), Some(v)) => Some((k.to_string(), v.to_string())),
+                        _ => None,
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
-
-
