@@ -44,3 +44,12 @@ pub fn escape_markdown_v2(text: &str) -> String {
 
     escaped
 }
+
+fn is_valid_uri(uri: &str) -> bool {
+    uri.starts_with("ss://")
+        || uri.starts_with("vless://")
+        || uri.starts_with("vmess://")
+        || uri.starts_with("wg://")
+        || uri.starts_with("trojan://")
+        || uri.starts_with("wireguard://")
+}
