@@ -1,4 +1,6 @@
+mod text;
 mod utils;
+
 use chrono::Local;
 use serde_json::json;
 use singbox::config;
@@ -6,25 +8,30 @@ use singbox::error::ConversionError;
 use singbox::protocol::Protocol;
 use std::path::PathBuf;
 use teloxide::{
-    dispatching::{dialogue, dialogue::InMemStorage, UpdateHandler},
+    dispatching::{
+        dialogue::{self, GetChatId, InMemStorage},
+        UpdateHandler,
+    },
     prelude::*,
-    types::InputFile,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile},
     utils::command::BotCommands,
 };
 
 type MyDialogue = Dialogue<State, InMemStorage<State>>;
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
+extern crate pretty_env_logger;
+#[macro_use]
+extern crate log;
+
 #[derive(Clone, Default)]
 pub enum State {
     #[default]
-    Start,
     Sing,
     ReceiveURI,
-    ReceiveConfigType {
-        uri: String,
-    },
+    ReceiveInboundType,
+    ReceiveCountryGeoType,
+    ReceiveConfigType,
 }
 
 #[derive(BotCommands, Clone)]
@@ -56,21 +63,20 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
     use dptree::case;
 
     let command_handler = teloxide::filter_command::<Command, _>()
-        .branch(
-            case![State::Start]
-                .branch(case![Command::Help].endpoint(help))
-                .branch(case![Command::Start].endpoint(start))
-                .branch(case![Command::Sing].endpoint(sing)),
-        )
-        .branch(case![Command::Cancel].endpoint(cancel));
+        .branch(case![State::Sing].branch(case![Command::Sing].endpoint(sing)))
+        .branch(case![Command::Cancel].endpoint(cancel))
+        .branch(case![Command::Help].endpoint(help))
+        .branch(case![Command::Start].endpoint(start));
 
     let message_handler = Update::filter_message()
         .branch(command_handler)
-        .branch(case![State::ReceiveURI].endpoint(receive_uri))
+        .branch(case![State::Sing].endpoint(receive_uri))
         .branch(dptree::endpoint(invalid_state));
 
     let callback_query_handler = Update::filter_callback_query()
-        .branch(case![State::ReceiveConfigType { uri }].endpoint(receive_config_type));
+        .branch(case![State::ReceiveConfigType].endpoint(receive_config_type))
+        .branch(case![State::ReceiveInboundType].endpoint(receive_inbound_type))
+        .branch(case![State::ReceiveCountryGeoType].endpoint(receive_country_geo_type));
 
     dialogue::enter::<Update, InMemStorage<State>, State, _>()
         .branch(message_handler)
@@ -78,37 +84,33 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 }
 
 async fn sing(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, "Let's start! Send Your URI")
+    bot.send_message(msg.chat.id, text::SING_START_DESC.to_string())
         .await?;
     dialogue.update(State::ReceiveURI).await?;
     Ok(())
 }
 
 pub async fn start(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, "🚀 Welcome to SingBox Config Bot")
+    bot.send_message(msg.chat.id, text::START_WELCOME_MESSAGE.to_string())
         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .await?;
-    bot.send_message(msg.chat.id, utils::help_message())
+    let scapedtext = utils::escape_markdown_v2(&utils::help_message());
+    bot.send_message(msg.chat.id, scapedtext)
         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .await?;
     Ok(())
 }
 
-// async fn help(bot: Bot, msg: Message) -> HandlerResult {
-//     bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
-//     Ok(())
-// }
-
 pub async fn help(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, utils::help_message())
+    let scapedtext = utils::escape_markdown_v2(&utils::help_message());
+    bot.send_message(msg.chat.id, scapedtext)
         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .await?;
     Ok(())
 }
 
 async fn cancel(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, "Cancelling the dialogue.")
-        .await?;
+    bot.send_message(msg.chat.id, text::CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
 }
@@ -131,14 +133,51 @@ async fn receive_uri(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerRes
             bot.send_message(msg.chat.id, "Select a Config Type:")
                 .reply_markup(InlineKeyboardMarkup::new([config_types]))
                 .await?;
-            dialogue.update(State::ReceiveConfigType { uri }).await?;
+            dialogue.update(State::ReceiveConfigType).await?;
         }
         None => {
             bot.send_message(msg.chat.id, "Please, send me your sing-box/xray uri")
                 .await?;
         }
     }
+    Ok(())
+}
 
+async fn receive_inbound_type(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
+    match msg.text().map(ToOwned::to_owned) {
+        Some(uri) => {
+            let inbounds =
+                ["Mixed", "TUN"].map(|inbound| InlineKeyboardButton::callback(inbound, inbound));
+
+            bot.send_message(msg.chat.id, "Select a Inbound Type:")
+                .reply_markup(InlineKeyboardMarkup::new([inbounds]))
+                .await?;
+            dialogue.update(State::ReceiveCountryGeoType).await?;
+        }
+        None => {
+            bot.send_message(msg.chat.id, "Please, send me your sing-box/xray uri")
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn receive_country_geo_type(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
+    match msg.text().map(ToOwned::to_owned) {
+        Some(uri) => {
+            let countrys =
+                ["Mixed", "TUN"].map(|country| InlineKeyboardButton::callback(country, country));
+
+            bot.send_message(msg.chat.id, "Select a Inbound Type:")
+                .reply_markup(InlineKeyboardMarkup::new([countrys]))
+                .await?;
+            dialogue.update(State::ReceiveConfigType).await?;
+        }
+        None => {
+            bot.send_message(msg.chat.id, "Please, send me your sing-box/xray uri")
+                .await?;
+        }
+    }
     Ok(())
 }
 
@@ -151,11 +190,7 @@ async fn receive_config_type(
 ) -> HandlerResult {
     if let Some(config_type) = &q.data {
         if config_type == "SingBox" {
-            if let Err(e) = handle_sing(bot, msg, uri).await {
-                eprintln!("Failed to handle sing: {}", e);
-            } else {
-                dialogue.exit().await?;
-            }
+            bot.send_message(msg.chat.id, "Config");
         } else {
             bot.send_message(msg.chat.id, "❌ Error: Unsupported config type")
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
