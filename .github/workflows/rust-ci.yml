@@ -1,0 +1,38 @@
+name: Lint, Build, Test
+
+on:
+  push:
+    branches:
+        -"*"
+  pull_request:
+    branches:
+        - "*"
+
+jobs:
+  lint-build-test:
+    name: Lint, Build, Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          override: true
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build
+        run: cargo build --all-features
+
+      - name: Run Tests
+        run: cargo test --all-features
+        
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
