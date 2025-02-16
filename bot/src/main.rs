@@ -1,4 +1,3 @@
-mod text;
 mod utils;
 
 use chrono::Local;
@@ -7,40 +6,22 @@ use singbox::config;
 use singbox::error::ConversionError;
 use singbox::protocol::Protocol;
 use std::path::PathBuf;
-use teloxide::{
-    dispatching::{
-        dialogue::{self, GetChatId, InMemStorage},
-        UpdateHandler,
-    },
-    prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile},
-    utils::command::BotCommands,
-};
-
-type MyDialogue = Dialogue<State, InMemStorage<State>>;
-type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+use teloxide::{prelude::*, types::InputFile, types::Message, utils::command::BotCommands};
 
 extern crate pretty_env_logger;
-#[macro_use]
-extern crate log;
 
-#[derive(Clone, Default)]
-pub enum State {
-    #[default]
-    Sing,
-    ReceiveURI,
-    ReceiveInboundType,
-    ReceiveCountryGeoType,
-    ReceiveConfigType,
-}
+extern crate log;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
+#[command(description = "Commands:")]
 enum Command {
+    #[command(description = "Help")]
     Help,
+    #[command(description = "Start")]
     Start,
-    Sing,
-    Cancel,
+    #[command(description = "Process singbox URI - /singbox <version> <URI>")]
+    Singbox(String),
 }
 
 #[tokio::main]
@@ -50,149 +31,83 @@ async fn main() {
     log::info!("Starting Uri2Json bot...");
 
     let bot = Bot::from_env();
+    bot.set_my_commands(Command::bot_commands())
+        .await
+        .expect("Failed to set commands");
 
-    Dispatcher::builder(bot, schema())
-        .dependencies(dptree::deps![InMemStorage::<State>::new()])
+    let handler = Update::filter_message()
+        .filter_command::<Command>()
+        .endpoint(schema);
+
+    Dispatcher::builder(bot, handler)
         .enable_ctrlc_handler()
         .build()
         .dispatch()
         .await;
 }
 
-fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
-    use dptree::case;
-
-    let command_handler = teloxide::filter_command::<Command, _>()
-        .branch(case![State::Sing].branch(case![Command::Sing].endpoint(sing)))
-        .branch(case![Command::Cancel].endpoint(cancel))
-        .branch(case![Command::Help].endpoint(help))
-        .branch(case![Command::Start].endpoint(start));
-
-    let message_handler = Update::filter_message()
-        .branch(command_handler)
-        .branch(case![State::Sing].endpoint(receive_uri))
-        .branch(dptree::endpoint(invalid_state));
-
-    let callback_query_handler = Update::filter_callback_query()
-        .branch(case![State::ReceiveConfigType].endpoint(receive_config_type))
-        .branch(case![State::ReceiveInboundType].endpoint(receive_inbound_type))
-        .branch(case![State::ReceiveCountryGeoType].endpoint(receive_country_geo_type));
-
-    dialogue::enter::<Update, InMemStorage<State>, State, _>()
-        .branch(message_handler)
-        .branch(callback_query_handler)
-}
-
-async fn sing(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, text::SING_START_DESC.to_string())
-        .await?;
-    dialogue.update(State::ReceiveURI).await?;
-    Ok(())
-}
-
-pub async fn start(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, text::START_WELCOME_MESSAGE.to_string())
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .await?;
-    let scapedtext = utils::escape_markdown_v2(&utils::help_message());
-    bot.send_message(msg.chat.id, scapedtext)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .await?;
-    Ok(())
-}
-
-pub async fn help(bot: Bot, msg: Message) -> HandlerResult {
-    let scapedtext = utils::escape_markdown_v2(&utils::help_message());
-    bot.send_message(msg.chat.id, scapedtext)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .await?;
-    Ok(())
-}
-
-async fn cancel(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, text::CANCEL_MESSAGE).await?;
-    dialogue.exit().await?;
-    Ok(())
-}
-
-async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
-        "Unable to handle the message. Type /help to see the usage.",
-    )
-    .await?;
-    Ok(())
-}
-
-async fn receive_uri(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    match msg.text().map(ToOwned::to_owned) {
-        Some(uri) => {
-            let config_types = ["SingBox", "Xray"]
-                .map(|config_type| InlineKeyboardButton::callback(config_type, config_type));
-
-            bot.send_message(msg.chat.id, "Select a Config Type:")
-                .reply_markup(InlineKeyboardMarkup::new([config_types]))
-                .await?;
-            dialogue.update(State::ReceiveConfigType).await?;
-        }
-        None => {
-            bot.send_message(msg.chat.id, "Please, send me your sing-box/xray uri")
-                .await?;
-        }
-    }
-    Ok(())
-}
-
-async fn receive_inbound_type(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    match msg.text().map(ToOwned::to_owned) {
-        Some(uri) => {
-            let inbounds =
-                ["Mixed", "TUN"].map(|inbound| InlineKeyboardButton::callback(inbound, inbound));
-
-            bot.send_message(msg.chat.id, "Select a Inbound Type:")
-                .reply_markup(InlineKeyboardMarkup::new([inbounds]))
-                .await?;
-            dialogue.update(State::ReceiveCountryGeoType).await?;
-        }
-        None => {
-            bot.send_message(msg.chat.id, "Please, send me your sing-box/xray uri")
-                .await?;
-        }
-    }
-    Ok(())
-}
-
-async fn receive_country_geo_type(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
-    match msg.text().map(ToOwned::to_owned) {
-        Some(uri) => {
-            let countrys =
-                ["Mixed", "TUN"].map(|country| InlineKeyboardButton::callback(country, country));
-
-            bot.send_message(msg.chat.id, "Select a Inbound Type:")
-                .reply_markup(InlineKeyboardMarkup::new([countrys]))
-                .await?;
-            dialogue.update(State::ReceiveConfigType).await?;
-        }
-        None => {
-            bot.send_message(msg.chat.id, "Please, send me your sing-box/xray uri")
-                .await?;
-        }
-    }
-    Ok(())
-}
-
-async fn receive_config_type(
+async fn schema(
     bot: Bot,
-    dialogue: MyDialogue,
-    uri: String,
-    q: CallbackQuery,
     msg: Message,
-) -> HandlerResult {
-    if let Some(config_type) = &q.data {
-        if config_type == "SingBox" {
-            bot.send_message(msg.chat.id, "Config");
-        } else {
-            bot.send_message(msg.chat.id, "❌ Error: Unsupported config type")
+    cmd: Command,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    match cmd {
+        Command::Singbox(args) => {
+            let parts: Vec<&str> = args.splitn(3, ' ').collect();
+
+            if parts.len() < 2 {
+                bot.send_message(
+                    msg.chat.id,
+                    "Invalid format. Use /singbox <version> <URI>\nSupported versions: 1.11.0, 1.12.0",
+                )
+                .await?;
+                return Ok(());
+            }
+            let version = parts[0];
+            let uri = parts[1];
+
+            if !["1.11.0", "1.12.0"].contains(&version) {
+                bot.send_message(
+                    msg.chat.id,
+                    "Unsupported version. Currently supported: 1.11.0, 1.12.0",
+                )
+                .await?;
+                return Ok(());
+            }
+
+            if uri.is_empty() {
+                bot.send_message(msg.chat.id, "URI cannot be empty").await?;
+                return Ok(());
+            }
+
+            if !utils::is_valid_uri(uri) {
+                bot.send_message(msg.chat.id, "❌ Invalid URI").await?;
+                return Ok(());
+            }
+
+            match process_uri(version, uri).await {
+                Ok(filename) => {
+                    let file = InputFile::file(PathBuf::from(&filename));
+                    bot.send_document(msg.chat.id, file).await?;
+                    utils::cleanup_file(&filename).await;
+                }
+                Err(e) => {
+                    bot.send_message(msg.chat.id, format!("❌ Error processing URI:: {}", e))
+                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                        .await?;
+                }
+            }
+        }
+
+        Command::Start => {
+            let scapedtext = utils::escape_markdown_v2(&utils::welcome_message());
+            bot.send_message(msg.chat.id, scapedtext)
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+        }
+        Command::Help => {
+            let scapedtext = utils::escape_markdown_v2(&utils::help_message());
+            bot.send_message(msg.chat.id, scapedtext)
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                 .await?;
         }
@@ -200,28 +115,10 @@ async fn receive_config_type(
     Ok(())
 }
 
-pub async fn handle_sing(bot: Bot, msg: Message, uri: String) -> ResponseResult<()> {
-    match process_uri(&uri).await {
-        Ok(filename) => {
-            let file = InputFile::file(PathBuf::from(&filename));
-            bot.send_document(msg.chat.id, file).await?;
-            utils::cleanup_file(&filename).await;
-        }
-        Err(e) => {
-            bot.send_message(msg.chat.id, format!("❌ Error: {}", e))
-                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .await?;
-        }
-    }
-    Ok(())
-}
-
-async fn process_uri(uri: &str) -> Result<String, ConversionError> {
-    let version = "1.11.0".to_string();
-
+async fn process_uri(version: &str, uri: &str) -> Result<String, ConversionError> {
     let protocol = Protocol::parse_uri(uri)?;
 
-    let mut config = match config::SingBoxConfig::new(version.clone()) {
+    let mut config = match config::SingBoxConfig::new(version.to_string().clone()) {
         Ok(config) => config,
         Err(e) => return Err(ConversionError::Other(e.to_string())),
     };

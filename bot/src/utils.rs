@@ -1,14 +1,29 @@
 use std::time::Duration;
 use tokio::{fs, time};
 
+pub fn welcome_message() -> String {
+    r#"
+    🎉 Welcome to URI to JSON Bot!
+            I can help you process singbox URIs with version support.
+            📋 Available commands:
+            /start - Show this welcome message
+            /help - Show available commands
+            /singbox <version> <URI> - Process URI for specific version
+            🔍 Supported versions: 1.11.0, 1.12.0
+            /xray comming soon ...
+    "#
+    .trim()
+    .replace("    ", "")
+    .to_string()
+}
+
 pub fn help_message() -> String {
     r#"
-    🚀 *SingBox Config Bot* 🚀
-    _Convert URIs to SingBox configuration files_
-    
-    *Commands:*
-    /sing - Generate config from URI
-    /help - Show this help message
+    📋 Available commands:
+            /start - Show this welcome message
+            /help - Show available commands
+            /singbox <version> <URI> - Process URI for specific version
+    🔍 Supported versions: 1.11.0, 1.12.0
     
     *Supported Protocols:*
     - `ss://` Shadowsocks
@@ -45,7 +60,7 @@ pub fn escape_markdown_v2(text: &str) -> String {
     escaped
 }
 
-fn is_valid_uri(uri: &str) -> bool {
+pub fn is_valid_uri(uri: &str) -> bool {
     uri.starts_with("ss://")
         || uri.starts_with("vless://")
         || uri.starts_with("vmess://")
