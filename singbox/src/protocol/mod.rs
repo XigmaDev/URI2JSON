@@ -248,6 +248,7 @@ impl Protocol {
             } => {
                 let mut config = json!({
                     "type": "shadowsocks",
+                    "tag": "proxy",
                     "server": host,
                     "server_port": port,
                     "method": method,
@@ -272,6 +273,7 @@ impl Protocol {
             } => {
                 let mut config = json!({
                     "type": "vmess",
+                    "tag": "proxy",
                     "server": host,
                     "server_port": port,
                     "uuid": uuid,
@@ -296,7 +298,7 @@ impl Protocol {
             } => {
                 let mut config = json!({
                     "type": "vless",
-                    "tag" : "vless-out",
+                    "tag": "proxy",
                     "server": host,
                     "server_port": port,
                     "uuid": uuid,
@@ -323,6 +325,7 @@ impl Protocol {
             } => {
                 let mut config = json!({
                     "type": "trojan",
+                    "tag": "proxy",
                     "server": host,
                     "server_port": port,
                     "password": password,
@@ -344,7 +347,7 @@ impl Protocol {
             } => {
                 let config = json!({
                     "type": "wireguard",
-                    "tag": "wireguard-out",
+                    "tag": "proxy",
                     "local_address": [ip],
                     "private_key": private_key,
                     "peer_public_key": public_key,

@@ -76,7 +76,7 @@ impl SingBoxConfig {
             "type": "mixed",
             "tag": "mixed-in",
             "listen": "::",
-            "listen_port": 1080,
+            "listen_port": 2080,
             "sniff": true,
             "sniff_override_destination": true,
         }));
@@ -113,14 +113,6 @@ impl SingBoxConfig {
                     "type": "direct",
                     "tag": "direct",
                 }));
-                self.outbounds.push(json!({
-                    "type": "block",
-                    "tag": "block",
-                }));
-                self.outbounds.push(json!({
-                    "type": "dns",
-                    "tag": "dns-out",
-                }));
             }
         }
         Ok(())
@@ -155,9 +147,11 @@ impl SingBoxConfig {
                     if tag.is_some_and(|t| t == "local") {
                         servers.push(json!({
                             "type": tag,
+                            "tag": tag,
                         }));
                     } else {
                         servers.push(json!({
+                            "tag":tag,
                             "type": type_,
                             "server": server
                         }));
@@ -227,14 +221,156 @@ impl SingBoxConfig {
     //       "geosite": {}
     //     }
     //   }
-    pub fn set_route(&mut self, rules: Value, rule_set: Value) {
-        self.route = json!({
-            "auto_detect_interface": true,
-            "override_android_vpn": true,
-            "rules": rules,
-            "rule_set":rule_set,
-
-        });
+    pub fn set_route(&mut self) {
+        if self.version >= Version::new(1, 12, 0) {
+            self.route = json!({
+                "auto_detect_interface": true,
+                "override_android_vpn": true,
+                "default_domain_resolver": {
+                    "server": "local"
+                },
+                "final":"proxy",
+                "rules":json!([
+                        {
+                            "inbound": "tun-in",
+                            "action": "sniff"
+                        },
+                        {
+                            "protocol": "dns",
+                            "action": "hijack-dns"
+                        },
+                        {
+                            "ip_is_private": true,
+                            "outbound": "direct"
+                        },
+                        {
+                            "rule_set": [
+                                "geosite-category-public-tracker",
+                                "geosite-category-ads",
+                                "geosite-category-ads-all",
+                                "geosite-google-ads"
+                            ],
+                            "action": "reject"
+                        },
+                        {
+                            "inbound": [
+                                "mixed-in",
+                                "tun-in"
+                            ],
+                            "action":"route",
+                            "outbound": "proxy"
+                        }
+                    ]),
+                "rule_set":json!([
+                    {
+                        "type": "remote",
+                        "format": "binary",
+                        "tag": "geosite-category-ads-all",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    },
+                    {
+                        "type": "remote",
+                        "format": "binary",
+                        "tag": "geosite-google-ads",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-ads.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    },
+                    {
+                        "type": "remote",
+                        "format": "binary",
+                        "tag": "geosite-category-ads",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    },
+                    {
+                        "tag": "geosite-category-public-tracker",
+                        "type": "remote",
+                        "format": "binary",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-public-tracker.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    }
+                ])
+            });
+        } else {
+            self.route = json!({
+                "auto_detect_interface": true,
+                "override_android_vpn": true,
+                "final":"proxy",
+                "rules":json!([
+                    {
+                        "inbound": [
+                            "tun-in",
+                            "mixed-in"
+                        ],
+                        "source_ip_cidr": [
+                            "172.18.0.1/32",
+                            "fdfe:dcba:9876::1/126"
+                        ],
+                        "ip_cidr": [
+                            "172.18.0.2/32"
+                        ],
+                        "protocol": "dns",
+                        "action": "hijack-dns"
+                    },
+                    {
+                        "rule_set": [
+                            "geosite-category-public-tracker",
+                            "geosite-category-ads",
+                            "geosite-category-ads-all",
+                            "geosite-google-ads"
+                        ],
+                        "action": "reject"
+                    },
+                    {
+                        "inbound": [
+                            "mixed-in",
+                            "tun-in"
+                        ],
+                        "action": "route",
+                        "outbound": "proxy"
+                    }
+                ]),
+                "rule_set":json!([
+                    {
+                        "type": "remote",
+                        "format": "binary",
+                        "tag": "geosite-category-ads-all",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    },
+                    {
+                        "type": "remote",
+                        "format": "binary",
+                        "tag": "geosite-google-ads",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-ads.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    },
+                    {
+                        "type": "remote",
+                        "format": "binary",
+                        "tag": "geosite-category-ads",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    },
+                    {
+                        "tag": "geosite-category-public-tracker",
+                        "type": "remote",
+                        "format": "binary",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-public-tracker.srs",
+                        "download_detour": "direct",
+                        "update_interval": "1d"
+                    }
+                ])
+            });
+        }
     }
 
     pub fn add_default_experimental(&mut self) {
@@ -249,8 +385,8 @@ impl SingBoxConfig {
         let mut map = Map::new();
 
         map.insert("log".to_string(), self.log.clone());
+        map.insert("ntp".to_string(), self.ntp.clone());
         map.insert("dns".to_string(), self.dns.clone());
-        //map.insert("ntp".to_string(), self.ntp.clone());
         map.insert(
             "endpoints".to_string(),
             Value::Array(self.endpoints.clone()),

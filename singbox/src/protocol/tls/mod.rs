@@ -34,7 +34,7 @@ impl TlsConfig {
         if let Some(utls) = &self.utls {
             config["utls"] = json!({
                 "enabled": true,
-                "fingerptint": utls.fingerprint,
+                "fingerprint": utls.fingerprint,
             });
         }
 

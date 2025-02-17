@@ -1,7 +1,6 @@
 mod utils;
 
 use chrono::Local;
-use serde_json::json;
 use singbox::config;
 use singbox::error::ConversionError;
 use singbox::protocol::Protocol;
@@ -133,75 +132,7 @@ async fn process_uri(version: &str, uri: &str) -> Result<String, ConversionError
     if let Err(e) = config.add_outbound(protocol) {
         eprintln!("Failed to add outbound: {}", e);
     }
-    config.set_route(
-        json!([
-            {
-                "inbound": [
-                    "tun-in",
-                    "mixed-in"
-                ],
-                "source_ip_cidr": [
-                    "172.18.0.1/32",
-                    "fdfe:dcba:9876::1/126"
-                ],
-                "ip_cidr": [
-                    "172.18.0.2/32"
-                ],
-                "protocol": "dns",
-                "outbound": "dns-out"
-            },
-            {
-                "rule_set": [
-                    "geosite-category-public-tracker",
-                    "geosite-category-ads",
-                    "geosite-category-ads-all",
-                    "geosite-google-ads"
-                ],
-                "outbound": "block"
-            },
-            {
-                "inbound": [
-                    "mixed-in",
-                    "tun-in"
-                ],
-                "outbound": "direct"
-            }
-        ]),
-        json!([
-            {
-                "type": "remote",
-                "format": "binary",
-                "tag": "geosite-category-ads-all",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-                "download_detour": "direct",
-                "update_interval": "1d"
-            },
-            {
-                "type": "remote",
-                "format": "binary",
-                "tag": "geosite-google-ads",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-ads.srs",
-                "download_detour": "direct",
-                "update_interval": "1d"
-            },
-            {
-                "type": "remote",
-                "format": "binary",
-                "tag": "geosite-category-ads",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads.srs",
-                "download_detour": "direct",
-                "update_interval": "1d"
-            },
-            {
-                "tag": "geosite-category-public-tracker",
-                "type": "remote",
-                "format": "binary",
-                "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-public-tracker.srs",
-                "download_detour": "direct",
-                "update_interval": "1d"
-            }
-        ])
-    );
+    config.set_route();
     config.add_default_experimental();
 
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
