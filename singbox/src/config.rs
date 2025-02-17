@@ -139,6 +139,7 @@ impl SingBoxConfig {
         server: &str,
         tag: Option<&str>,
         detour: Option<&str>,
+        resolver: Option<&str>,
     ) {
         if self.version >= Version::new(1, 12, 0) {
             // Version 1.12+ format
@@ -166,7 +167,9 @@ impl SingBoxConfig {
                 format!("{}://{}", type_, server)
             };
 
-            let mut server_entry = json!({ "address": address });
+            let mut server_entry = json!({
+                "address": address
+            });
 
             if let Some(t) = tag {
                 server_entry["tag"] = json!(t);
@@ -174,6 +177,9 @@ impl SingBoxConfig {
 
             if let Some(d) = detour {
                 server_entry["detour"] = json!(d);
+            }
+            if let Some(resolver) = resolver {
+                server_entry["address_resolver"] = json!(resolver);
             }
 
             if let Value::Object(ref mut dns) = self.dns {

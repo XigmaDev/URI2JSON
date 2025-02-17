@@ -21,6 +21,8 @@ enum Command {
     Help,
     #[command(description = "Process singbox URI - /singbox <version> <URI>")]
     Singbox(String),
+    #[command(description = "Xray Comming Soon")]
+    Xray,
 }
 
 #[tokio::main]
@@ -110,6 +112,13 @@ async fn schema(
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                 .await?;
         }
+        Command::Xray => {
+            let scapedtext =
+                utils::escape_markdown_v2("🚧 Xray support is coming soon. Stay tuned!");
+            bot.send_message(msg.chat.id, scapedtext)
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+        }
     }
     Ok(())
 }
@@ -123,9 +132,8 @@ async fn process_uri(version: &str, uri: &str) -> Result<String, ConversionError
     };
     config.set_log_level("error");
     config.set_ntp();
-    config.add_dns_server("tls", "8.8.8.8", Some("google"), None);
-    config.add_dns_server("", "223.5.5.5", Some("local"), Some("direct"));
-    config.add_dns_rule("any", "local");
+    config.add_dns_server("tls", "1.1.1.1", Some("cf"), None, Some("local"));
+    config.add_dns_server("", "223.5.5.5", Some("local"), Some("direct"), None);
 
     config.add_mixed_inbound();
     config.add_tun_inbound();
