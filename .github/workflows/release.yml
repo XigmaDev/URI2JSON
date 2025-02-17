@@ -60,11 +60,17 @@ jobs:
           body: |
             Automated release for version ${{ github.ref_name }}
           files: |
-            target/release/uri2json
+            target/debug/bot
             overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+            name: bot
+            path: "target/debug/bot"
+            
       - name: Upload binary via SCP
         uses: appleboy/scp-action@v0.1.6
         with:
@@ -72,8 +78,8 @@ jobs:
             username: ${{ secrets.SSH_USERNAME }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             port: ${{ secrets.PORT }}
-            source: "target/release/uri2json"
-            target: "/home/${{ secrets.SSH_USERNAME }}/uri2json" 
+            source: "target/debug/bot"
+            target: "/home/${{ secrets.SSH_USERNAME }}/bot" 
   
       - name: Restart application via SSH
         uses: appleboy/ssh-action@v0.1.10
