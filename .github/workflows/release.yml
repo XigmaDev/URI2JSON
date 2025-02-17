@@ -64,3 +64,25 @@ jobs:
             overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload binary via SCP
+        uses: appleboy/scp-action@v0.1.6
+        with:
+            host: ${{ secrets.SSH_HOST }} 
+            username: ${{ secrets.SSH_USERNAME }}
+            key: ${{ secrets.SSH_PRIVATE_KEY }}
+            port: ${{ secrets.PORT }}
+            source: "target/release/uri2json"
+            target: "/home/${{ secrets.SSH_USERNAME }}/uri2json" 
+  
+      - name: Restart application via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+            host: ${{ secrets.SSH_HOST }}
+            username: ${{ secrets.SSH_USERNAME }}
+            key: ${{ secrets.SSH_PRIVATE_KEY }}
+            port: ${{ secrets.PORT }}
+            script: |
+              echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > /home/${{ secrets.SSH_USERNAME }}/uri2json/.env
+              sudo chmod +x /home/${{ secrets.SSH_USERNAME }}/uri2json/uri2json
+              sudo systemctl restart uri2json.service
