@@ -10,7 +10,7 @@ pub struct SingBoxConfig {
     version: Version,
     log: Value,
     dns: Value,
-    //ntp: Value,
+    ntp: Value,
     endpoints: Vec<Value>,
     inbounds: Vec<Value>,
     outbounds: Vec<Value>,
@@ -30,7 +30,7 @@ impl SingBoxConfig {
                 "servers": [],
                 "rules": [],
             }),
-            //ntp: json!({}),
+            ntp: json!({}),
             endpoints: Vec::new(),
             inbounds: Vec::new(),
             outbounds: Vec::new(),
@@ -51,6 +51,23 @@ impl SingBoxConfig {
         self.log = json!({
             "level": level,
             "timestamp": true
+        });
+    }
+
+    //     "ntp": {
+    //     "enabled": true,
+    //     "server": "time.apple.com",
+    //     "server_port": 123,
+    //     "interval": "30m0s",
+    //     "detour": "direct"
+    //   },
+    pub fn set_ntp(&mut self) {
+        self.ntp = json!({
+            "enabled": true,
+            "server": "time.apple.com",
+            "server_port": 123,
+            "interval": "30m0s",
+            "detour": "direct"
         });
     }
 

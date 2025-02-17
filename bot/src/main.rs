@@ -123,6 +123,7 @@ async fn process_uri(version: &str, uri: &str) -> Result<String, ConversionError
         Err(e) => return Err(ConversionError::Other(e.to_string())),
     };
     config.set_log_level("error");
+    config.set_ntp();
     config.add_dns_server("tls", "8.8.8.8", Some("google"), None);
     config.add_dns_server("", "223.5.5.5", Some("local"), Some("direct"));
     config.add_dns_rule("any", "local");
