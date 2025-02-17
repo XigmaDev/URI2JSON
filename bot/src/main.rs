@@ -16,10 +16,10 @@ extern crate log;
 #[command(rename_rule = "lowercase")]
 #[command(description = "Commands:")]
 enum Command {
-    #[command(description = "Help")]
-    Help,
     #[command(description = "Start")]
     Start,
+    #[command(description = "Help")]
+    Help,
     #[command(description = "Process singbox URI - /singbox <version> <URI>")]
     Singbox(String),
 }
@@ -122,7 +122,7 @@ async fn process_uri(version: &str, uri: &str) -> Result<String, ConversionError
         Ok(config) => config,
         Err(e) => return Err(ConversionError::Other(e.to_string())),
     };
-    config.set_log_level("info");
+    config.set_log_level("error");
     config.add_dns_server("tls", "8.8.8.8", Some("google"), None);
     config.add_dns_server("", "223.5.5.5", Some("local"), Some("direct"));
     config.add_dns_rule("any", "local");
