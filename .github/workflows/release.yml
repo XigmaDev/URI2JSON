@@ -60,7 +60,7 @@ jobs:
           body: |
             Automated release for version ${{ github.ref_name }}
           files: |
-            target/debug/bot
+            target/release/bot
             overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,7 +69,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
             name: bot
-            path: "target/debug/bot"
+            path: "target/release/bot"
             
       - name: Upload binary via SCP
         uses: appleboy/scp-action@v0.1.6
@@ -78,8 +78,8 @@ jobs:
             username: ${{ secrets.SSH_USERNAME }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             port: ${{ secrets.PORT }}
-            source: "target/debug/bot"
-            target: "/home/${{ secrets.SSH_USERNAME }}/bot" 
+            source: "target/release/bot"
+            target: "/home/${{ secrets.SSH_USERNAME }}/uri2json_bot/uri2json" 
   
       - name: Restart application via SSH
         uses: appleboy/ssh-action@v0.1.10
@@ -89,6 +89,6 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             port: ${{ secrets.PORT }}
             script: |
-              echo "TELOXIDE_TOKEN=${{ secrets.BOT_TOKEN }}" > /home/${{ secrets.SSH_USERNAME }}/uri2json/.env
-              sudo chmod +x /home/${{ secrets.SSH_USERNAME }}/uri2json/uri2json
+              echo "TELOXIDE_TOKEN=${{ secrets.BOT_TOKEN }}" > /home/${{ secrets.SSH_USERNAME }}/uri2json_bot/.env
+              sudo chmod +x /home/${{ secrets.SSH_USERNAME }}/uri2json_bot/uri2json
               sudo systemctl restart uri2json.service
