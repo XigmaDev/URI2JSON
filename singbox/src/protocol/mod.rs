@@ -401,7 +401,13 @@ fn parse_transport(
         }
         "ws" | "websocket" => Ok(transport::TransportConfig::Websocket {
             path: query.remove("path").unwrap_or_default(),
-            headers: parse_headers(query.remove("headers")),
+            headers: {
+                let mut headers = parse_headers(query.remove("headers"));
+                if let Some(host) = query.remove("host") {
+                    headers.insert("Host".to_string(), host);
+                }
+                headers
+            },
             max_early_data: query
                 .remove("max_early_data")
                 .and_then(|s| s.parse().ok())
