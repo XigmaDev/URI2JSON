@@ -11,6 +11,11 @@ pub fn welcome_message() -> String {
             /singbox <version> <URI> - Process URI for specific version
             🔍 Supported versions: 1.11.0, 1.12.0
             /xray comming soon ...
+            "We're currently in beta version ! 
+            If you encounter any issues or have feedback, 
+            please let us know
+            @ip_routes_admin
+            we appreciate your support!"
     "#
     .trim()
     .replace("    ", "")
