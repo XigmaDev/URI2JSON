@@ -44,8 +44,8 @@ impl FromStr for TransportConfig {
     type Err = ConversionError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "tcp" => Ok(TransportConfig::TCP),
-            "http" => Ok(TransportConfig::Http {
+            "tcp" | "" => Ok(TransportConfig::TCP),
+            "http" | "h2" => Ok(TransportConfig::Http {
                 host: Vec::new(),
                 path: String::new(),
                 method: String::new(),

@@ -392,7 +392,43 @@ fn parse_transport(
         .to_lowercase();
 
     match transport_type.as_str() {
-        "http" => {
+        "tcp" | "" => {
+            let header_type: String = query
+                .remove("headerType")
+                .unwrap_or_else(|| "none".to_string());
+            if header_type == "http" {
+                let host = query
+                    .remove("host")
+                    .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
+                    .unwrap_or_else(Vec::new);
+
+                let path = query
+                    .remove("path")
+                    .map(|mut p| {
+                        if !p.starts_with('/') {
+                            p.insert(0, '/');
+                        }
+                        p
+                    })
+                    .unwrap_or_default();
+
+                Ok(transport::TransportConfig::Http {
+                    host,
+                    path,
+                    method: query.remove("method").unwrap_or_else(|| "GET".to_string()),
+                    headers: parse_headers(query.remove("headers")),
+                    idle_timeout: query
+                        .remove("idle_timeout")
+                        .unwrap_or_else(|| "15s".to_string()),
+                    ping_timeout: query
+                        .remove("ping_timeout")
+                        .unwrap_or_else(|| "15s".to_string()),
+                })
+            } else {
+                Ok(transport::TransportConfig::TCP)
+            }
+        }
+        "http" | "h2" => {
             let host = query
                 .remove("host")
                 .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
@@ -437,9 +473,8 @@ fn parse_transport(
             early_data_header_name: query.remove("early_data_header_name").unwrap_or_default(),
         }),
         "quic" => Ok(transport::TransportConfig::Quic),
-        "tcp" => Ok(transport::TransportConfig::TCP),
         "grpc" => Ok(transport::TransportConfig::Grpc {
-            service_name: query.remove("service_name").unwrap_or_default(),
+            service_name: query.remove("serviceName").unwrap_or_default(),
             idle_timeout: query
                 .remove("idle_timeout")
                 .unwrap_or_else(|| "15s".to_string()),
