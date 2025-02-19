@@ -1999,6 +1999,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
