@@ -309,17 +309,6 @@ impl SingBoxConfig {
                 "final":"proxy",
                 "rules":json!([
                     {
-                        "inbound": [
-                            "tun-in",
-                            "mixed-in"
-                        ],
-                        "source_ip_cidr": [
-                            "172.18.0.1/32",
-                            "fdfe:dcba:9876::1/126"
-                        ],
-                        "ip_cidr": [
-                            "172.18.0.2/32"
-                        ],
                         "protocol": "dns",
                         "action": "hijack-dns"
                     },
@@ -393,10 +382,12 @@ impl SingBoxConfig {
         map.insert("log".to_string(), self.log.clone());
         map.insert("ntp".to_string(), self.ntp.clone());
         map.insert("dns".to_string(), self.dns.clone());
-        map.insert(
-            "endpoints".to_string(),
-            Value::Array(self.endpoints.clone()),
-        );
+        if self.version >= semver::Version::new(1, 12, 0) {
+            map.insert(
+                "endpoints".to_string(),
+                Value::Array(self.endpoints.clone()),
+            );
+        }
         map.insert("inbounds".to_string(), Value::Array(self.inbounds.clone()));
         map.insert(
             "outbounds".to_string(),

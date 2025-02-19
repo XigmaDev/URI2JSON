@@ -132,8 +132,14 @@ async fn process_uri(version: &str, uri: &str) -> Result<String, ConversionError
     };
     config.set_log_level("error");
     config.set_ntp();
-    config.add_dns_server("tls", "1.1.1.1", Some("cf"), None, Some("local"));
-    config.add_dns_server("", "223.5.5.5", Some("local"), Some("direct"), None);
+    config.add_dns_server(
+        "tls",
+        "dns.adguard-dns.com",
+        Some("remote"),
+        None,
+        Some("cf"),
+    );
+    config.add_dns_server("tls", "1.1.1.1", Some("cf"), None, None);
 
     config.add_mixed_inbound();
     config.add_tun_inbound();
