@@ -5,7 +5,7 @@ edition = "2021"
 
 
 [dependencies]
-singbox ={ version = "0.4.0" ,path = "../singbox"}
+singbox ={ version = "0.5.0" ,path = "../singbox"}
 tokio = { version = "1.0", features = ["full"] }
 log = "0.4"
 pretty_env_logger = "0.5"
