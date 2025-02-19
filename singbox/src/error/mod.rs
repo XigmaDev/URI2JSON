@@ -24,6 +24,7 @@ pub enum ConversionError {
     InvalidDnsObject,
     MissingServersArray,
     MissingTypeField,
+    UnsupportedShadowsocks,
     Other(String),
 }
 
@@ -54,6 +55,7 @@ impl fmt::Display for ConversionError {
                 write!(f, "Missing or invalid 'servers' array in DNS configuration")
             }
             Self::MissingTypeField => write!(f, "Missing type field"),
+            Self::UnsupportedShadowsocks => write!(f, "Unsupported Shadowsocks"),
             Self::Other(e) => write!(f, "{}", e),
         }
     }

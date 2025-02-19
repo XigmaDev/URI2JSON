@@ -86,12 +86,34 @@ impl Protocol {
 
     fn parse_shadowsocks(data: &str) -> Result<Self, ConversionError> {
         let url = Url::parse(&format!("ss://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
+
+        let mut password = url.password().map(|p| p.to_string());
+        let mut method = url.username().to_string();
+
+        // If no password was provided, try to decode the method.
+        if password.is_none() {
+            let decrypted = match general_purpose::STANDARD.decode(&method) {
+                Ok(decoded_bytes) => match String::from_utf8(decoded_bytes) {
+                    Ok(decoded_str) => decoded_str,
+                    Err(_) => method.to_string(),
+                },
+                Err(_) => method.to_string(),
+            };
+            let decrypted_arr: Vec<&str> = decrypted.split(':').collect();
+            if decrypted_arr.len() > 1 {
+                method = decrypted_arr[0].to_string();
+                password = Some(decrypted_arr[1..].join(":"));
+            } else {
+                return Err(ConversionError::UnsupportedShadowsocks);
+            }
+        }
+        let password = password.unwrap();
+
         Ok(Self::Shadowsocks {
-            method: url.username().to_string(),
-            password: url
-                .password()
-                .ok_or(ConversionError::MissingPassword)?
-                .to_string(),
+            method,
+            password: urlencoding::decode(&password)
+                .map_err(|_| ConversionError::FailedDecode)?
+                .into_owned(),
             host: url
                 .host_str()
                 .ok_or(ConversionError::MissingHost)?
