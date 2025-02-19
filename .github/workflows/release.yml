@@ -66,10 +66,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-            name: bot
-            path: "target/release/bot"
+            name: uri2json
+            path: "target/release/"
             
       - name: Upload binary via SCP
         uses: appleboy/scp-action@v0.1.6

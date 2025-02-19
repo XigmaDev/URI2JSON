@@ -3,19 +3,27 @@ use tokio::{fs, time};
 
 pub fn welcome_message() -> String {
     r#"
-    🎉 Welcome to URI to JSON Bot!
-            I can help you process singbox URIs with version support.
-            📋 Available commands:
-            /start - Show this welcome message
-            /help - Show available commands
-            /singbox <version> <URI> - Process URI for specific version
-            🔍 Supported versions: 1.11.0, 1.12.0
-            /xray comming soon ...
-            "We're currently in beta version ! 
-            If you encounter any issues or have feedback, 
-            please let us know
-            @ip_routes_admin
-            we appreciate your support!"
+🎉 Welcome to the URI to JSON Bot!
+
+I'm here to help you Convert URI into JSON configurations compatible with SingBox and Xray.
+
+📋 Available Commands:
+
+- /start — Show this welcome message
+- /help — Display all available commands
+- /singbox <version> <URI> — Process a URI for a specific version
+🔍 Supported Versions:
+
+- 1.11.0
+- 1.12.0
+
+🚀 Coming Soon:
+ - /xray command
+
+Beta Notice:
+"We're currently in beta! If you encounter any issues or have feedback, please let us know.
+@ip_routes_admin
+We appreciate your support!"
     "#
     .trim()
     .replace("    ", "")
