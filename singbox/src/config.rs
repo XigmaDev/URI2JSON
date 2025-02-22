@@ -57,7 +57,9 @@ impl SingBoxConfig {
             "type": "mixed",
             "tag": "mixed-in",
             "listen": "::",
-            "listen_port": 2080
+            "listen_port": 2080,
+            "sniff": true,
+            "sniff_override_destination": true
         }));
     }
 
@@ -149,7 +151,7 @@ impl SingBoxConfig {
                     }));
                     servers.push(json!({
                         "tag": "local",
-                        "address": "1.1.1.1",
+                        "address": "tls://1.1.1.1",
                         "detour": "direct"
                     }));
                 }
@@ -223,7 +225,6 @@ impl SingBoxConfig {
                                 "mixed-in",
                                 "tun-in"
                             ],
-                            "action":"route",
                             "outbound": "proxy"
                         }
                     ]),
@@ -290,7 +291,6 @@ impl SingBoxConfig {
                             "mixed-in",
                             "tun-in"
                         ],
-                        "action": "route",
                         "outbound": "proxy"
                     }
                 ]),
