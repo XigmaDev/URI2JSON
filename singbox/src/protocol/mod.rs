@@ -324,6 +324,7 @@ impl Protocol {
                     "server": host,
                     "server_port": port,
                     "uuid": uuid,
+                    "packet_encoding": "xudp",
                     "transport": transport.to_config(),
                 });
 
@@ -400,7 +401,7 @@ fn parse_transport(
                 let host = query
                     .remove("host")
                     .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
 
                 let path = query
                     .remove("path")
@@ -425,14 +426,14 @@ fn parse_transport(
                         .unwrap_or_else(|| "15s".to_string()),
                 })
             } else {
-                Ok(transport::TransportConfig::TCP)
+                Ok(transport::TransportConfig::Tcp)
             }
         }
         "http" | "h2" => {
             let host = query
                 .remove("host")
                 .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
-                .unwrap_or_else(Vec::new);
+                .unwrap_or_default();
 
             let path = query
                 .remove("path")

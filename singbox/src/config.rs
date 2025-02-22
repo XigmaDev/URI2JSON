@@ -10,7 +10,6 @@ pub struct SingBoxConfig {
     version: Version,
     log: Value,
     dns: Value,
-    ntp: Value,
     endpoints: Vec<Value>,
     inbounds: Vec<Value>,
     outbounds: Vec<Value>,
@@ -30,7 +29,6 @@ impl SingBoxConfig {
                 "servers": [],
                 "rules": [],
             }),
-            ntp: json!({}),
             endpoints: Vec::new(),
             inbounds: Vec::new(),
             outbounds: Vec::new(),
@@ -54,51 +52,34 @@ impl SingBoxConfig {
         });
     }
 
-    //     "ntp": {
-    //     "enabled": true,
-    //     "server": "time.apple.com",
-    //     "server_port": 123,
-    //     "interval": "30m0s",
-    //     "detour": "direct"
-    //   },
-    pub fn set_ntp(&mut self) {
-        self.ntp = json!({
-            "enabled": true,
-            "server": "time.apple.com",
-            "server_port": 123,
-            "interval": "30m0s",
-            "detour": "direct"
-        });
-    }
-
     pub fn add_mixed_inbound(&mut self) {
         self.inbounds.push(json!({
             "type": "mixed",
             "tag": "mixed-in",
             "listen": "::",
-            "listen_port": 2080,
-            "sniff": true,
-            "sniff_override_destination": true,
+            "listen_port": 2080
         }));
     }
 
     pub fn add_tun_inbound(&mut self) {
         self.inbounds.push(json!({
-            "type": "tun",
-            "tag": "tun-in",
-            "interface_name": "tun0",
-            "address": [
-              "172.18.0.1/30",
-              "fdfe:dcba:9876::1/126"
-            ],
-            "auto_route": true,
-            "mtu": 1492,
-            "strict_route": false,
-            "stack": "system",
-            "sniff": true,
-            "endpoint_independent_nat": true,
-            "sniff_override_destination": true,
-            "sniff_timeout": "300ms"
+                "type": "tun",
+                "tag": "tun-in",
+                "interface_name": "tun0",
+                "address": [
+                  "172.18.0.1/30"
+                ],
+                "gso": false,
+                "auto_route": true,
+                "mtu": 1358,
+                "strict_route": true,
+                "udp_timeout": "5s",
+                "stack": "system",
+                "sniff": true,
+                "sniff_override_destination": true,
+                "sniff_timeout": "300ms",
+                "endpoint_independent_nat": true,
+
         }));
     }
 
@@ -133,74 +114,57 @@ impl SingBoxConfig {
     //     }
     //   }
 
-    pub fn add_dns_server(
-        &mut self,
-        type_: &str,
-        server: &str,
-        tag: Option<&str>,
-        detour: Option<&str>,
-        resolver: Option<&str>,
-    ) {
+    pub fn add_dns_server(&mut self) {
         if self.version >= Version::new(1, 12, 0) {
-            // Version 1.12+ format
             if let Value::Object(ref mut dns) = self.dns {
-                if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
-                    if tag.is_some_and(|t| t == "local") {
-                        servers.push(json!({
-                            "type": tag,
-                            "tag": tag,
-                        }));
-                    } else {
-                        servers.push(json!({
-                            "tag":tag,
-                            "type": type_,
-                            "server": server
-                        }));
-                    }
+                let servers = dns
+                    .entry("servers")
+                    .or_insert_with(|| Value::Array(Vec::new()));
+                if let Value::Array(ref mut servers) = servers {
+                    servers.push(json!({
+                        "tag": "remote",
+                        "type": "tls",
+                        "server": "dns.adguard-dns.com",
+                        "domain_resolver": "local"
+                    }));
+                    servers.push(json!({
+                        "tag": "local",
+                        "type": "tls",
+                        "server": "1.1.1.1"
+                    }));
                 }
             }
-        } else {
-            // Legacy version format
-            let address = if type_.is_empty() {
-                server.to_string()
-            } else {
-                format!("{}://{}", type_, server)
-            };
-
-            let mut server_entry = json!({
-                "address": address
-            });
-
-            if let Some(t) = tag {
-                server_entry["tag"] = json!(t);
-            }
-
-            if let Some(d) = detour {
-                server_entry["detour"] = json!(d);
-            }
-            if let Some(resolver) = resolver {
-                server_entry["address_resolver"] = json!(resolver);
-            }
-
+        } else if self.version < Version::new(1, 12, 0) {
             if let Value::Object(ref mut dns) = self.dns {
-                if let Some(Value::Array(ref mut servers)) = dns.get_mut("servers") {
-                    servers.push(server_entry);
+                let servers = dns
+                    .entry("servers")
+                    .or_insert_with(|| Value::Array(Vec::new()));
+                if let Value::Array(ref mut servers) = servers {
+                    servers.push(json!({
+                        "tag": "remote",
+                        "address": "tls://dns.adguard-dns.com",
+                        "address_resolver": "local",
+                        "strategy": "prefer_ipv4",
+                        "detour": "proxy"
+                    }));
+                    servers.push(json!({
+                        "tag": "local",
+                        "address": "1.1.1.1",
+                        "detour": "direct"
+                    }));
                 }
             }
         }
     }
 
-    pub fn add_dns_rule(&mut self, outbound: &str, server_tag: &str) {
+    pub fn add_dns_rule(&mut self) {
         if self.version < Version::new(1, 12, 0) {
             if let Value::Object(ref mut dns) = self.dns {
                 let rules = dns
                     .entry("rules")
                     .or_insert_with(|| Value::Array(Vec::new()));
                 if let Value::Array(ref mut rules) = rules {
-                    rules.push(json!({
-                        "outbound": outbound,
-                        "server": server_tag
-                    }));
+                    //rules.push(json!({}));
                 }
             }
         }
@@ -237,10 +201,6 @@ impl SingBoxConfig {
                 },
                 "final":"proxy",
                 "rules":json!([
-                        {
-                            "inbound": "tun-in",
-                            "action": "sniff"
-                        },
                         {
                             "protocol": "dns",
                             "action": "hijack-dns"
@@ -313,6 +273,10 @@ impl SingBoxConfig {
                         "action": "hijack-dns"
                     },
                     {
+                        "ip_is_private": true,
+                        "outbound": "direct"
+                    },
+                    {
                         "rule_set": [
                             "geosite-category-public-tracker",
                             "geosite-category-ads",
@@ -380,7 +344,6 @@ impl SingBoxConfig {
         let mut map = Map::new();
 
         map.insert("log".to_string(), self.log.clone());
-        map.insert("ntp".to_string(), self.ntp.clone());
         map.insert("dns".to_string(), self.dns.clone());
         if self.version >= semver::Version::new(1, 12, 0) {
             map.insert(

@@ -22,9 +22,9 @@ async fn main() {
                     }
                 };
                 config.set_log_level("info");
-                config.add_dns_server("tls", "8.8.8.8", Some("google"), None, None);
-                config.add_dns_server("", "223.5.5.5", Some("local"), Some("direct"), None);
-                config.add_dns_rule("any", "local");
+                config.add_dns_server();
+
+                config.add_dns_rule();
 
                 config.add_mixed_inbound();
                 config.add_tun_inbound();

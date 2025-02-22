@@ -7,7 +7,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum TransportConfig {
-    TCP,
+    Tcp,
     Http {
         host: Vec<String>,
         path: String,
@@ -44,7 +44,7 @@ impl FromStr for TransportConfig {
     type Err = ConversionError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "tcp" | "" => Ok(TransportConfig::TCP),
+            "Tcp" | "" => Ok(TransportConfig::Tcp),
             "http" | "h2" => Ok(TransportConfig::Http {
                 host: Vec::new(),
                 path: String::new(),
@@ -79,7 +79,7 @@ impl FromStr for TransportConfig {
 impl TransportConfig {
     pub fn to_config(&self) -> Value {
         match self {
-            TransportConfig::TCP => json!({}),
+            TransportConfig::Tcp => json!({}),
             TransportConfig::Http {
                 host,
                 path,
