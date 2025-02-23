@@ -74,16 +74,6 @@ impl Protocol {
 }
 
 impl Protocol {
-    pub fn get_type(&self) -> &str {
-        match self {
-            Self::Shadowsocks { .. } => "Shadowsocks",
-            Self::Vmess { .. } => "Vmess",
-            Self::Vless { .. } => "Vless",
-            Self::Trojan { .. } => "Trojan",
-            Self::Wireguard { .. } => "Wireguard",
-        }
-    }
-
     fn parse_shadowsocks(data: &str) -> Result<Self, ConversionError> {
         let url = Url::parse(&format!("ss://{}", data)).map_err(|_| ConversionError::InvalidUri)?;
 

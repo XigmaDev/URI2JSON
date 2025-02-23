@@ -58,8 +58,6 @@ impl SingBoxConfig {
             "tag": "mixed-in",
             "listen": "::",
             "listen_port": 2080,
-            "sniff": true,
-            "sniff_override_destination": true
         }));
     }
 
@@ -69,19 +67,22 @@ impl SingBoxConfig {
                 "tag": "tun-in",
                 "interface_name": "tun0",
                 "address": [
-                  "172.18.0.1/30"
+                  "172.18.0.1/30",
+                  "fdfe:dcba:9876::1/126"
+                ],
+                "route_exclude_address": [
+                    "192.168.0.0/16",
+                    "10.0.0.0/8",
+                    "169.254.0.0/16",
+                    "172.16.0.0/12",
+                    "fe80::/10",
+                    "fc00::/7"
                 ],
                 "gso": false,
                 "auto_route": true,
                 "mtu": 1358,
                 "strict_route": true,
                 "udp_timeout": "5s",
-                "stack": "system",
-                "sniff": true,
-                "sniff_override_destination": true,
-                "sniff_timeout": "300ms",
-                "endpoint_independent_nat": true,
-
         }));
     }
 
@@ -145,14 +146,17 @@ impl SingBoxConfig {
                     servers.push(json!({
                         "tag": "remote",
                         "address": "tls://dns.adguard-dns.com",
-                        "address_resolver": "local",
-                        "strategy": "prefer_ipv4",
+                        "address_resolver": "dns-local",
                         "detour": "proxy"
                     }));
                     servers.push(json!({
-                        "tag": "local",
+                        "tag": "dns-local",
                         "address": "tls://1.1.1.1",
                         "detour": "direct"
+                    }));
+                    servers.push(json!({
+                        "address": "fakeip",
+                        "tag": "fake"
                     }));
                 }
             }
@@ -166,8 +170,41 @@ impl SingBoxConfig {
                     .entry("rules")
                     .or_insert_with(|| Value::Array(Vec::new()));
                 if let Value::Array(ref mut rules) = rules {
-                    //rules.push(json!({}));
+                    rules.push(json!({
+                        "outbound": "any",
+                        "server": "dns-local"
+                    }));
+                    rules.push(json!({
+                        "domain": [
+                            "raw.githubusercontent.com",
+                            "time.apple.com",
+                            ],
+                        "server": "dns-local"
+                    }));
+                    rules.push(json!({
+                        "rule_set": "geosite-category-ir",
+                        "server": "dns-local"
+                    }));
+                    rules.push(json!({
+                        "disable_cache": true,
+                        "inbound": "tun-in",
+                        "query_type": [
+                            "A",
+                            "AAAA"
+                        ],
+                        "server": "fake"
+                    }));
                 }
+                dns.insert("independent_cache".to_string(), json!(true));
+                dns.insert(
+                    "fakeip".to_string(),
+                    json!({
+                        "enabled": true,
+                        "inet4_range": "198.18.0.0/15",
+                        "inet6_range": "fc00::/18"
+                    }),
+                );
+                dns.insert("strategy".to_string(), json!("prefer_ipv4"));
             }
         }
     }
@@ -201,8 +238,11 @@ impl SingBoxConfig {
                 "default_domain_resolver": {
                     "server": "local"
                 },
-                "final":"proxy",
                 "rules":json!([
+                        {
+                            "inbound": "tun-in",
+                            "action": "sniff"
+                        },
                         {
                             "protocol": "dns",
                             "action": "hijack-dns"
@@ -218,7 +258,15 @@ impl SingBoxConfig {
                                 "geosite-category-ads-all",
                                 "geosite-google-ads"
                             ],
-                            "action": "reject"
+                            "action": "reject",
+                            "method": "default"
+                        },
+                        {
+                            "rule_set": [
+                              "geosite-category-ir",
+                              "geoip-ir"
+                            ],
+                            "outbound": "direct"
                         },
                         {
                             "inbound": [
@@ -226,6 +274,12 @@ impl SingBoxConfig {
                                 "tun-in"
                             ],
                             "outbound": "proxy"
+                        },
+                        {
+                            "network": "udp",
+                            "port": 443,
+                            "protocol": "quic",
+                            "outbound": "block"
                         }
                     ]),
                 "rule_set":json!([
@@ -260,15 +314,34 @@ impl SingBoxConfig {
                         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-public-tracker.srs",
                         "download_detour": "direct",
                         "update_interval": "1d"
-                    }
+                    },
+                    {
+                        "type": "remote",
+                        "tag": "geosite-category-ir",
+                        "format": "binary",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ir.srs",
+                        "download_detour": "direct",
+                        "update_interval": "168h0m0s"
+                      },
+                      {
+                        "type": "remote",
+                        "tag": "geoip-ir",
+                        "format": "binary",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ir.srs",
+                        "download_detour": "direct",
+                        "update_interval": "168h0m0s"
+                      }
                 ])
             });
         } else {
             self.route = json!({
                 "auto_detect_interface": true,
                 "override_android_vpn": true,
-                "final":"proxy",
                 "rules":json!([
+                    {
+                        "inbound": "tun-in",
+                        "action": "sniff"
+                    },
                     {
                         "protocol": "dns",
                         "action": "hijack-dns"
@@ -284,7 +357,15 @@ impl SingBoxConfig {
                             "geosite-category-ads-all",
                             "geosite-google-ads"
                         ],
-                        "action": "reject"
+                        "action": "reject",
+                        "method": "default"
+                    },
+                    {
+                        "rule_set": [
+                          "geosite-category-ir",
+                          "geoip-ir"
+                        ],
+                        "outbound": "direct"
                     },
                     {
                         "inbound": [
@@ -292,6 +373,12 @@ impl SingBoxConfig {
                             "tun-in"
                         ],
                         "outbound": "proxy"
+                    },
+                    {
+                        "network": "udp",
+                        "port": 443,
+                        "protocol": "quic",
+                        "outbound": "block"
                     }
                 ]),
                 "rule_set":json!([
@@ -326,7 +413,23 @@ impl SingBoxConfig {
                         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-public-tracker.srs",
                         "download_detour": "direct",
                         "update_interval": "1d"
-                    }
+                    },
+                    {
+                        "type": "remote",
+                        "tag": "geosite-category-ir",
+                        "format": "binary",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ir.srs",
+                        "download_detour": "direct",
+                        "update_interval": "168h0m0s"
+                      },
+                      {
+                        "type": "remote",
+                        "tag": "geoip-ir",
+                        "format": "binary",
+                        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ir.srs",
+                        "download_detour": "direct",
+                        "update_interval": "168h0m0s"
+                      }
                 ])
             });
         }
