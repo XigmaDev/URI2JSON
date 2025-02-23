@@ -73,14 +73,15 @@ jobs:
       - name: Upload binary via SCP
         uses: appleboy/scp-action@v0.1.6
         with:
-            host: ${{ secrets.SSH_HOST }} 
+            host: ${{ secrets.SSH_HOST }}
             username: ${{ secrets.SSH_USERNAME }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             port: ${{ secrets.PORT }}
             source: "target/release/bot"
-            target: "/home/${{ secrets.SSH_USERNAME }}/uri2json_bot/uri2json"
+            target: "/home/${{ secrets.SSH_USERNAME }}/uri2json_bot/"
+            strip_components: 2
             overwrite: true
-
+            debug: true
       - name: Restart application via SSH
         uses: appleboy/ssh-action@v0.1.10
         with:
