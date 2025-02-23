@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "bot"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "dotenv",
@@ -1988,7 +1988,7 @@ dependencies = [
 
 [[package]]
 name = "singbox"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
