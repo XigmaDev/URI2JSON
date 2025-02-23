@@ -91,5 +91,5 @@ jobs:
             port: ${{ secrets.PORT }}
             script: |
               echo "TELOXIDE_TOKEN=${{ secrets.BOT_TOKEN }}" > /home/${{ secrets.SSH_USERNAME }}/uri2json_bot/.env
-              sudo chmod +x /home/${{ secrets.SSH_USERNAME }}/uri2json_bot/uri2json
+              sudo chmod +x /home/${{ secrets.SSH_USERNAME }}/uri2json_bot/bot
               sudo systemctl restart uri2json.service
